@@ -252,7 +252,7 @@ function registerIpc() {
       loadWindow(printWin, 'index.html', `?print=${month}`);
       await new Promise((resolve) => printWin.webContents.once('did-finish-load', () => resolve(undefined)));
       await new Promise((resolve) => setTimeout(resolve, 300));
-      const pdfBuffer = await printWin.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
+      const pdfBuffer = await printWin.webContents.printToPDF({ printBackground: true, pageSize: 'A4', landscape: true });
       const fs = await import('node:fs/promises');
       await fs.writeFile(filePath, pdfBuffer);
       printWin.destroy();
@@ -267,7 +267,7 @@ function registerIpc() {
     loadWindow(printWin, 'index.html', `?print=${month}`);
     await new Promise((resolve) => printWin.webContents.once('did-finish-load', () => resolve(undefined)));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    printWin.webContents.print({ printBackground: true }, () => printWin.destroy());
+    printWin.webContents.print({ printBackground: true, landscape: true }, () => printWin.destroy());
   });
 
   ipcMain.handle('overlay:setCompact', (_e, compact) => {

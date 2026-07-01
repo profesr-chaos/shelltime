@@ -35,8 +35,8 @@ export function ExportPreview({ month, onClose }: { month: string; onClose: () =
           <Button variant="primary" onClick={exportPdf} disabled={busy}>Export PDF</Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto py-8">
-        <div className="mx-auto max-w-3xl rounded-2xl shadow-lg">
+      <div className="flex-1 overflow-auto py-8">
+        <div className="mx-auto w-[1120px] max-w-full rounded-2xl bg-white shadow-lg">
           <PrintReport month={month} />
         </div>
       </div>

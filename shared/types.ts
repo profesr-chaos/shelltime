@@ -72,6 +72,12 @@ export interface MonthlyProjectHours {
   minutes: number;
 }
 
+export interface MonthlyProjectGridRow {
+  project: Project;
+  totalMinutes: number;
+  minutesByDate: Record<string, number>; // date (YYYY-MM-DD) -> minutes
+}
+
 export interface MonthlyDailyTotal {
   date: string;
   minutes: number;
@@ -97,6 +103,7 @@ export interface MonthlySummary {
   lastMonthOvertimeMinutes: number;
   lastMonthActualMinutes: number;
   byProject: MonthlyProjectHours[];
+  grid: MonthlyProjectGridRow[];
   dailyTotals: MonthlyDailyTotal[];
   insights: MonthlyInsights;
 }

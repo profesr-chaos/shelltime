@@ -496,6 +496,19 @@ export function getMonthlySummary(month: string): MonthlySummary {
   }
   const byProject = [...byProjectMap.values()].sort((a, b) => b.minutes - a.minutes);
 
+  // Project x day matrix for the report grid.
+  const minutesByProjectDate = new Map<number, Record<string, number>>();
+  for (const e of entries) {
+    const row = minutesByProjectDate.get(e.projectId) ?? {};
+    row[e.date] = (row[e.date] ?? 0) + e.durationMinutes;
+    minutesByProjectDate.set(e.projectId, row);
+  }
+  const grid = byProject.map((bp) => ({
+    project: bp.project,
+    totalMinutes: bp.minutes,
+    minutesByDate: minutesByProjectDate.get(bp.project.id) ?? {},
+  }));
+
   const byDateMap = new Map<string, number>();
   const codesByDate = new Map<string, string[]>();
   for (const e of entries) {
@@ -535,6 +548,7 @@ export function getMonthlySummary(month: string): MonthlySummary {
     lastMonthOvertimeMinutes,
     lastMonthActualMinutes,
     byProject,
+    grid,
     dailyTotals,
     insights: {
       mostWorkedProject: byProject[0]?.project ?? null,
