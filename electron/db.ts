@@ -326,18 +326,6 @@ export function listHolidays(month: string): { date: string; minutes: number }[]
 
 // ---------- data export ----------
 
-export function getEntriesForCsv(month?: string): { date: string; code: string; name: string; minutes: number; source: string }[] {
-  const clause = month ? 'WHERE dpt.date LIKE ?' : '';
-  const params = month ? [`${month}%`] : [];
-  return db
-    .prepare(
-      `SELECT dpt.date AS date, p.code AS code, p.name AS name, dpt.duration_minutes AS minutes, dpt.source AS source
-       FROM daily_project_time dpt JOIN projects p ON p.id = dpt.project_id
-       ${clause} ORDER BY dpt.date ASC, p.code ASC`
-    )
-    .all(...params) as any[];
-}
-
 export function backupDatabase(dest: string): Promise<void> {
   return db.backup(dest).then(() => undefined);
 }

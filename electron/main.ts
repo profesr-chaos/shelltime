@@ -304,23 +304,6 @@ function registerIpc() {
     }
   });
 
-  handle('export:csv', async (_e, month: string) => {
-    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
-      title: 'Export tracked time (CSV)',
-      defaultPath: `Shelltime-${month}.csv`,
-      filters: [{ name: 'CSV', extensions: ['csv'] }],
-    });
-    if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
-    const rows = db.getEntriesForCsv(month);
-    const esc = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`;
-    const csv = ['Date,Project Code,Project Name,Hours,Source']
-      .concat(rows.map((r) => [r.date, esc(r.code), esc(r.name), (r.minutes / 60).toFixed(2), r.source].join(',')))
-      .join('\r\n');
-    const fs = await import('node:fs/promises');
-    await fs.writeFile(filePath, csv, 'utf8');
-    return { ok: true, filePath };
-  });
-
   handle('backup:database', async () => {
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
       title: 'Back up database',

@@ -84,8 +84,6 @@ const api = {
   reportExport: {
     exportPdf: (month: string): Promise<{ ok: boolean; filePath?: string; error?: string }> =>
       ipcRenderer.invoke('export:pdf', month),
-    exportCsv: (month: string): Promise<{ ok: boolean; filePath?: string; error?: string }> =>
-      ipcRenderer.invoke('export:csv', month),
     exportXlsx: (month: string): Promise<{ ok: boolean; filePath?: string; error?: string }> =>
       ipcRenderer.invoke('export:xlsx', month),
     print: (month: string): Promise<void> => ipcRenderer.invoke('export:print', month),
