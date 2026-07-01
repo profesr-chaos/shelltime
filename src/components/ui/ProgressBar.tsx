@@ -14,12 +14,15 @@ export function ProgressBar({ fraction, tone = 'amber', showSnail = true, paused
 
   return (
     <div className="relative h-2 w-full rounded-full bg-slate-100">
-      <div className={`h-2 rounded-full ${fillColor} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      <div className={`h-1 rounded-full ${fillColor} transition-all duration-500`} style={{ width: `${pct}%` }} />
       {showSnail && (
         <img
           src={paused ? snailPaused : snailProgress}
           alt=""
-          className="absolute top-1/2 h-10 w-10 -translate-y-1/2 -translate-x-1/2 select-none"
+          className={
+            paused ?            
+            "absolute top-1/2 h-8 w-8 -translate-y-1/2 -translate-x-1/2 select-none"
+          : "absolute top-1/2 h-16 w-16 -translate-y-1/2 -translate-x-1/2 select-none"}
           style={{ left: `${pct}%` }}
         />
       )}
