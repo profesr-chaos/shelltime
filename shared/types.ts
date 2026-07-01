@@ -31,6 +31,23 @@ export interface Note {
   updatedAt: string;
 }
 
+export type LeaveType = 'holiday' | 'sick';
+
+export interface LeaveRecord {
+  id: number;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  half: boolean;
+  days: number; // working days in the range, x0.5 if a half day
+}
+
+export interface LeaveSummary {
+  holiday: number; // days this month
+  sick: number;
+  dates: string[]; // leave dates in the month (for the calendar)
+}
+
 export interface Settings {
   defaultDailyTargetMinutes: number;
   breakIntervalMinutes: number;

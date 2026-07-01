@@ -10,6 +10,9 @@ import type {
   EntrySource,
   MonthlySummary,
   MonthlyDailyTotal,
+  LeaveType,
+  LeaveRecord,
+  LeaveSummary,
 } from '../shared/types';
 import { OVERLAY_OPACITY_FLOOR } from '../shared/types';
 
@@ -90,6 +93,15 @@ export function initDb(userDataDir: string) {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      half INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
     );
   `);
 
@@ -288,58 +300,90 @@ export function deleteProject(id: number): void {
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
 }
 
-// ---------- holidays ----------
-// A holiday is a day booked at its full daily target under a dedicated inactive "HOLIDAY" project,
-// so annual leave counts toward the monthly target instead of dragging it down.
-const HOLIDAY_CODE = 'HOLIDAY';
+// ---------- leave (holiday / sick) ----------
+// A leave range books each working day it covers at the daily target (or half) under a dedicated
+// inactive project (HOLIDAY or SICK), so paid leave counts toward the monthly target. The range is
+// also stored in leave_records so it can be listed and removed as a whole.
+const LEAVE_PROJECT: Record<LeaveType, { code: string; name: string; color: string }> = {
+  holiday: { code: 'HOLIDAY', name: 'Holiday', color: '#0EA5E9' },
+  sick: { code: 'SICK', name: 'Sick leave', color: '#F43F5E' },
+};
 
 function getProjectByCode(code: string): Project | null {
   const row = db.prepare('SELECT * FROM projects WHERE code = ?').get(code);
   return row ? rowToProject(row) : null;
 }
 
-function ensureHolidayProject(): Project {
-  const existing = getProjectByCode(HOLIDAY_CODE);
+function ensureLeaveProject(type: LeaveType): Project {
+  const def = LEAVE_PROJECT[type];
+  const existing = getProjectByCode(def.code);
   if (existing) return existing;
-  const created = createProject({ code: HOLIDAY_CODE, name: 'Holiday', color: '#0EA5E9' });
+  const created = createProject({ code: def.code, name: def.name, color: def.color });
   return setProjectActive(created.id, false); // keep it out of timing lists
 }
 
-export function addHoliday(date: string, fraction = 1): DailyEntry {
-  const project = ensureHolidayProject();
-  return setDailyEntry(date, project.id, getDailyTargetMinutes(date) * fraction, 'manual');
-}
-
-export function removeHoliday(date: string): void {
-  const project = getProjectByCode(HOLIDAY_CODE);
-  if (project) deleteDailyEntry(date, project.id);
-}
-
-// Books every working day in [startDate, endDate] (inclusive) as a holiday, skipping weekends and
-// bank holidays. Order-independent. Returns the dates actually booked.
-export function addHolidayRange(startDate: string, endDate: string, fraction = 1): string[] {
-  const [from, to] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
-  const booked: string[] = [];
+// Working days (skipping weekends and public holidays) in [from, to] inclusive.
+function workingDaysBetween(from: string, to: string): string[] {
+  const days: string[] = [];
   const cursor = new Date(from + 'T00:00:00');
   const end = new Date(to + 'T00:00:00');
   while (cursor <= end) {
     const ds = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    if (isWorkingDay(ds)) {
-      addHoliday(ds, fraction);
-      booked.push(ds);
-    }
+    if (isWorkingDay(ds)) days.push(ds);
     cursor.setDate(cursor.getDate() + 1);
   }
-  return booked;
+  return days;
 }
 
-export function listHolidays(month: string): { date: string; minutes: number; targetMinutes: number }[] {
-  const project = getProjectByCode(HOLIDAY_CODE);
-  if (!project) return [];
+function rowToLeave(r: any): LeaveRecord {
+  const days = workingDaysBetween(r.start_date, r.end_date).length * (r.half ? 0.5 : 1);
+  return { id: r.id, type: r.type, startDate: r.start_date, endDate: r.end_date, half: !!r.half, days };
+}
+
+export function addLeave(type: LeaveType, startDate: string, endDate: string, half: boolean): LeaveRecord {
+  const [from, to] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
+  const project = ensureLeaveProject(type);
+  const fraction = half ? 0.5 : 1;
+  for (const date of workingDaysBetween(from, to)) {
+    setDailyEntry(date, project.id, getDailyTargetMinutes(date) * fraction, 'manual');
+  }
+  const res = db
+    .prepare('INSERT INTO leave_records (type, start_date, end_date, half, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(type, from, to, half ? 1 : 0, now());
+  return rowToLeave(db.prepare('SELECT * FROM leave_records WHERE id = ?').get(res.lastInsertRowid));
+}
+
+export function deleteLeave(id: number): void {
+  const r = db.prepare('SELECT * FROM leave_records WHERE id = ?').get(id) as any;
+  if (!r) return;
+  const project = getProjectByCode(LEAVE_PROJECT[r.type as LeaveType].code);
+  if (project) for (const date of workingDaysBetween(r.start_date, r.end_date)) deleteDailyEntry(date, project.id);
+  db.prepare('DELETE FROM leave_records WHERE id = ?').run(id);
+}
+
+export function listLeave(): LeaveRecord[] {
+  const rows = db.prepare('SELECT * FROM leave_records ORDER BY start_date DESC').all() as any[];
+  return rows.map(rowToLeave);
+}
+
+// Days per type within `month`, plus the set of leave dates in the month (for the calendar).
+export function getLeaveSummary(month: string): LeaveSummary {
+  const [y, m] = month.split('-').map(Number);
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
   const rows = db
-    .prepare('SELECT date, duration_minutes FROM daily_project_time WHERE project_id = ? AND date LIKE ? ORDER BY date ASC')
-    .all(project.id, `${month}%`) as any[];
-  return rows.map((r) => ({ date: r.date, minutes: r.duration_minutes, targetMinutes: getDailyTargetMinutes(r.date) }));
+    .prepare('SELECT * FROM leave_records WHERE start_date <= ? AND end_date >= ?')
+    .all(monthEnd, monthStart) as any[];
+  const counts = { holiday: 0, sick: 0 };
+  const dates = new Set<string>();
+  for (const r of rows) {
+    const from = r.start_date > monthStart ? r.start_date : monthStart;
+    const to = r.end_date < monthEnd ? r.end_date : monthEnd;
+    const wd = workingDaysBetween(from, to);
+    for (const d of wd) dates.add(d);
+    counts[r.type as LeaveType] += wd.length * (r.half ? 0.5 : 1);
+  }
+  return { holiday: counts.holiday, sick: counts.sick, dates: [...dates] };
 }
 
 // ---------- data export ----------

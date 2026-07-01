@@ -7,6 +7,9 @@ import type {
   EntrySource,
   TimerState,
   MonthlySummary,
+  LeaveType,
+  LeaveRecord,
+  LeaveSummary,
 } from '../shared/types';
 
 const api = {
@@ -34,12 +37,12 @@ const api = {
     applyDelta: (date: string, projectIds: number[], deltaMinutes: number): Promise<void> =>
       ipcRenderer.invoke('entries:applyDelta', date, projectIds, deltaMinutes),
   },
-  holidays: {
-    list: (month: string): Promise<{ date: string; minutes: number; targetMinutes: number }[]> =>
-      ipcRenderer.invoke('holidays:list', month),
-    addRange: (start: string, end: string, half = false): Promise<string[]> =>
-      ipcRenderer.invoke('holidays:addRange', start, end, half),
-    remove: (date: string): Promise<void> => ipcRenderer.invoke('holidays:remove', date),
+  leave: {
+    summary: (month: string): Promise<LeaveSummary> => ipcRenderer.invoke('leave:summary', month),
+    list: (): Promise<LeaveRecord[]> => ipcRenderer.invoke('leave:list'),
+    add: (type: LeaveType, start: string, end: string, half: boolean): Promise<LeaveRecord> =>
+      ipcRenderer.invoke('leave:add', type, start, end, half),
+    delete: (id: number): Promise<void> => ipcRenderer.invoke('leave:delete', id),
   },
   notes: {
     list: (date: string, projectId?: number): Promise<Note[]> => ipcRenderer.invoke('notes:list', date, projectId),

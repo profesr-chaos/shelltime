@@ -9,7 +9,7 @@ import { ChevronLeftIcon, ChevronRightIcon, TrendUpIcon } from '@/components/ico
 import { DonutChart } from '@/components/charts/DonutChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { EditTimingsModal } from '@/components/EditTimingsModal';
-import { HolidayCard } from '@/components/HolidayCard';
+import { LeaveCard } from '@/components/LeaveCard';
 
 interface DashboardProps {
   onOpenExport?: (month: string) => void;
@@ -111,16 +111,16 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
         </div>
       </div>
 
-      <div className="mt-6">
-        <HolidayCard month={month} onChanged={load} />
-      </div>
-
       <div className="mt-6 grid grid-cols-5 gap-4">
         <InsightCard label="Most-worked project" value={summary.insights.mostWorkedProject?.code ?? '—'} />
         <InsightCard label="Busiest day" value={summary.insights.busiestDay ? formatDateShort(summary.insights.busiestDay) : '—'} />
         <InsightCard label="Quietest day" value={summary.insights.quietestDay ? formatDateShort(summary.insights.quietestDay) : '—'} />
         <InsightCard label="Project switches" value={String(summary.insights.projectSwitches)} />
         <InsightCard label="Avg / working day" value={minutesToHoursLabel(summary.insights.averageMinutesPerWorkingDay)} />
+      </div>
+
+      <div className="mt-6">
+        <LeaveCard month={month} onChanged={load} />
       </div>
 
       {editDate && (

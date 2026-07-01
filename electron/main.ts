@@ -221,16 +221,18 @@ function registerIpc() {
     }
   });
 
-  handle('holidays:list', (_e, month) => db.listHolidays(month));
-  handle('holidays:addRange', (_e, start: string, end: string, half: boolean) => {
-    const booked = db.addHolidayRange(start, end, half ? 0.5 : 1);
-    if (booked.length) broadcast('projects:changed'); // the HOLIDAY project may have just been created
-    if (booked.includes(todayStr())) broadcast('timer:update', timer.getState());
-    return booked;
+  handle('leave:summary', (_e, month: string) => db.getLeaveSummary(month));
+  handle('leave:list', () => db.listLeave());
+  handle('leave:add', (_e, type, start: string, end: string, half: boolean) => {
+    const record = db.addLeave(type, start, end, half);
+    broadcast('projects:changed'); // the leave project may have just been created
+    if (todayStr() >= record.startDate && todayStr() <= record.endDate) broadcast('timer:update', timer.getState());
+    return record;
   });
-  handle('holidays:remove', (_e, date) => {
-    db.removeHoliday(date);
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
+  handle('leave:delete', (_e, id: number) => {
+    db.deleteLeave(id);
+    broadcast('projects:changed');
+    broadcast('timer:update', timer.getState());
   });
 
   handle('notes:list', (_e, date, projectId) => db.listNotes(date, projectId));
