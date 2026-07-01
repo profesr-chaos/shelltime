@@ -315,6 +315,24 @@ export function removeHoliday(date: string): void {
   if (project) deleteDailyEntry(date, project.id);
 }
 
+// Books every working day in [startDate, endDate] (inclusive) as a holiday, skipping weekends and
+// bank holidays. Order-independent. Returns the dates actually booked.
+export function addHolidayRange(startDate: string, endDate: string): string[] {
+  const [from, to] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
+  const booked: string[] = [];
+  const cursor = new Date(from + 'T00:00:00');
+  const end = new Date(to + 'T00:00:00');
+  while (cursor <= end) {
+    const ds = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    if (isWorkingDay(ds)) {
+      addHoliday(ds);
+      booked.push(ds);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return booked;
+}
+
 export function listHolidays(month: string): { date: string; minutes: number }[] {
   const project = getProjectByCode(HOLIDAY_CODE);
   if (!project) return [];

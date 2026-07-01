@@ -37,6 +37,7 @@ const api = {
   holidays: {
     list: (month: string): Promise<{ date: string; minutes: number }[]> => ipcRenderer.invoke('holidays:list', month),
     add: (date: string): Promise<DailyEntry> => ipcRenderer.invoke('holidays:add', date),
+    addRange: (start: string, end: string): Promise<string[]> => ipcRenderer.invoke('holidays:addRange', start, end),
     remove: (date: string): Promise<void> => ipcRenderer.invoke('holidays:remove', date),
   },
   notes: {
