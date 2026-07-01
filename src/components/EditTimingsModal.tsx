@@ -64,7 +64,8 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
 
   // Dragging the snail retargets the day's total; spread the delta across the listed projects (proportionally, or evenly if all zero).
   const applySeek = (fraction: number) => {
-    const target = Math.round(fraction * targetMinutes);
+    // Lock the dropped total to the nearest 5 minutes.
+    const target = Math.round((fraction * targetMinutes) / 5) * 5;
     setRows((prev) => {
       const editable = prev.filter((r) => r.projectId !== '');
       if (editable.length === 0) return prev;

@@ -85,10 +85,11 @@ export function Today() {
   const monthDay = formatMonthDay(date);
 
   const handleSeek = (newFraction: number) => {
-    const newTracked = newFraction * targetMinutes;
-    const delta = Math.round(newTracked - trackedMinutes);
+    // Lock the dropped total to the nearest 5 minutes.
+    const snappedTracked = Math.round((newFraction * targetMinutes) / 5) * 5;
+    const delta = Math.round(snappedTracked - trackedMinutes);
     if (delta === 0) return;
-    setSeekPreview(newFraction);
+    setSeekPreview(targetMinutes > 0 ? snappedTracked / targetMinutes : newFraction);
     setDistributeDelta(delta);
   };
 

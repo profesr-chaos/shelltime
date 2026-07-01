@@ -55,6 +55,12 @@ export class TimerEngine {
     this.emit();
   }
 
+  /** Public: force-persist the active project's in-flight session time to the DB before an external edit,
+   * so a relative delta lands on an up-to-date base instead of a value up to FLUSH_INTERVAL_MS stale. */
+  flushActive() {
+    this.flush();
+  }
+
   private flush() {
     try {
       this.rolloverDayIfNeeded();

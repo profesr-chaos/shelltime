@@ -182,6 +182,8 @@ function registerIpc() {
     }
   });
   ipcMain.handle('entries:applyDelta', (_e, date, projectIds, deltaMinutes) => {
+    // Persist any in-flight timer seconds first so this relative delta lands on an up-to-date base.
+    if (date === todayStr()) timer.flushActive();
     db.applyTimeDelta(date, projectIds, deltaMinutes);
     if (date === todayStr()) {
       for (const projectId of projectIds as number[]) timer.resyncProjectTotal(projectId);
