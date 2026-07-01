@@ -16,10 +16,22 @@ const HOLIDAY_REGIONS = [
   { value: 'US', label: 'United States' },
   { value: 'CA', label: 'Canada' },
   { value: 'AU', label: 'Australia' },
+  { value: 'NZ', label: 'New Zealand' },
+  { value: 'SE', label: 'Sweden' },
+  { value: 'NO', label: 'Norway' },
+  { value: 'DK', label: 'Denmark' },
+  { value: 'FI', label: 'Finland' },
   { value: 'DE', label: 'Germany' },
   { value: 'FR', label: 'France' },
   { value: 'ES', label: 'Spain' },
+  { value: 'IT', label: 'Italy' },
   { value: 'NL', label: 'Netherlands' },
+  { value: 'BE', label: 'Belgium' },
+  { value: 'CH', label: 'Switzerland' },
+  { value: 'AT', label: 'Austria' },
+  { value: 'PL', label: 'Poland' },
+  { value: 'PT', label: 'Portugal' },
+  { value: 'IN', label: 'India' },
 ];
 
 const DAYS = [
