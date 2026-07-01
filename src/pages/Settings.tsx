@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
 import { OVERLAY_OPACITY_FLOOR } from '@shared/types';
-import { Toggle, TextInput, FieldWrap } from '@/components/ui/Inputs';
+import { Toggle, TextInput, Select, FieldWrap } from '@/components/ui/Inputs';
 import { DurationInput } from '@/components/ui/DurationInput';
 import { Button } from '@/components/ui/Button';
 import { currentMonthStr } from '@/lib/format';
 import { useToast } from '@/components/ui/Toast';
+
+// Common regions; date-holidays supports many more (see hd.getCountries()).
+const HOLIDAY_REGIONS = [
+  { value: 'GB-ENG', label: 'United Kingdom — England & Wales' },
+  { value: 'GB-SCT', label: 'United Kingdom — Scotland' },
+  { value: 'GB-NIR', label: 'United Kingdom — Northern Ireland' },
+  { value: 'IE', label: 'Ireland' },
+  { value: 'US', label: 'United States' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'FR', label: 'France' },
+  { value: 'ES', label: 'Spain' },
+  { value: 'NL', label: 'Netherlands' },
+];
 
 const DAYS = [
   { day: 1, label: 'Mon' },
@@ -76,6 +91,26 @@ export function Settings() {
             })}
           </div>
         </FieldWrap>
+
+        <div>
+          <Toggle
+            checked={settings.skipBankHolidays}
+            onChange={(v) => update({ skipBankHolidays: v })}
+            label="Skip public holidays"
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Public holidays for your region won't count as working days, so they're excluded from monthly targets.
+          </p>
+          {settings.skipBankHolidays && (
+            <FieldWrap label="Holiday region">
+              <Select value={settings.holidayRegion} onChange={(e) => update({ holidayRegion: e.target.value })} className="max-w-xs">
+                {HOLIDAY_REGIONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </Select>
+            </FieldWrap>
+          )}
+        </div>
       </Section>
 
       <Section title="Targets">

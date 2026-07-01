@@ -42,6 +42,8 @@ export interface Settings {
   overlayOpacity: number;
   startWithWindows: boolean;
   workingDays: number[];
+  skipBankHolidays: boolean;
+  holidayRegion: string; // "GB-ENG", "IE", "US" … country code, optionally "-STATE"
 }
 
 export const OVERLAY_OPACITY_FLOOR = 0.3;

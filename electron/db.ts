@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import Holidays from 'date-holidays';
 import path from 'node:path';
 import fs from 'node:fs';
 import type {
@@ -27,6 +28,8 @@ const DEFAULT_SETTINGS: Settings = {
   overlayOpacity: 1,
   startWithWindows: false,
   workingDays: [1, 2, 3, 4, 5],
+  skipBankHolidays: true,
+  holidayRegion: 'GB-ENG',
 };
 
 export function clampOverlayOpacity(value: number): number {
@@ -140,9 +143,27 @@ function now() {
   return new Date().toISOString();
 }
 
+let holidayCache: { key: string; hd: Holidays } | null = null;
+function getHolidays(region: string): Holidays {
+  if (holidayCache?.key === region) return holidayCache.hd;
+  const [country, state] = region.split('-');
+  const hd = state ? new Holidays(country, state) : new Holidays(country);
+  holidayCache = { key: region, hd };
+  return hd;
+}
+
+function isBankHoliday(dateStr: string): boolean {
+  const settings = getSettings();
+  if (!settings.skipBankHolidays) return false;
+  // Noon avoids any timezone rollover to the previous/next day.
+  const result = getHolidays(settings.holidayRegion).isHoliday(new Date(dateStr + 'T12:00:00'));
+  return Array.isArray(result) && result.some((h) => h.type === 'public' || h.type === 'bank');
+}
+
 export function isWorkingDay(dateStr: string): boolean {
   const day = new Date(dateStr + 'T00:00:00').getDay();
-  return getSettings().workingDays.includes(day);
+  if (!getSettings().workingDays.includes(day)) return false;
+  return !isBankHoliday(dateStr);
 }
 
 function workingDaysInMonth(month: string): string[] {
