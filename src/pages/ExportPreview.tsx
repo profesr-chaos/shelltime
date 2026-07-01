@@ -16,6 +16,14 @@ export function ExportPreview({ month, onClose }: { month: string; onClose: () =
     else if (result.error !== 'Export cancelled') toast(result.error ?? 'Export failed', 'error');
   };
 
+  const exportCsv = async () => {
+    setBusy(true);
+    const result = await window.api.reportExport.exportCsv(month);
+    setBusy(false);
+    if (result.ok) toast(`Saved to ${result.filePath}`);
+    else if (result.error !== 'Export cancelled') toast(result.error ?? 'Export failed', 'error');
+  };
+
   const print = async () => {
     setBusy(true);
     await window.api.reportExport.print(month);
@@ -31,6 +39,7 @@ export function ExportPreview({ month, onClose }: { month: string; onClose: () =
         </div>
         <div className="flex gap-3">
           <Button variant="secondary" onClick={onClose}>Back to dashboard</Button>
+          <Button variant="secondary" onClick={exportCsv} disabled={busy}>Export CSV</Button>
           <Button variant="secondary" onClick={print} disabled={busy}>Print</Button>
           <Button variant="primary" onClick={exportPdf} disabled={busy}>Export PDF</Button>
         </div>

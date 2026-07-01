@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
-import type { MonthlySummary } from '@shared/types';
-import { formatMonth, minutesToHoursLabel, signedHoursLabel } from '@/lib/format';
+import type { MonthlySummary, Note, Project } from '@shared/types';
+import { formatMonth, minutesToHoursLabel, signedHoursLabel, formatDateShort } from '@/lib/format';
 
+type NoteWithProject = Note & { project: Project };
 const hoursCell = (minutes: number): string => (minutes > 0 ? (minutes / 60).toFixed(1) : '');
 
 export function PrintReport({ month }: { month: string }) {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [notes, setNotes] = useState<NoteWithProject[]>([]);
   const [exportedAt] = useState(() => new Date());
 
   useEffect(() => {
     window.api.dashboard.getMonthlySummary(month).then(setSummary);
+    window.api.notes.listForMonth(month).then(setNotes);
   }, [month]);
 
   if (!summary) {
@@ -110,8 +113,32 @@ export function PrintReport({ month }: { month: string }) {
           valueClass={isOvertime ? 'text-emerald-600' : 'text-red-500'}
         />
       </section>
+
+      {notes.length > 0 && (
+        <section className="mt-6 border-t border-slate-200 pt-4">
+          <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">Notes</h2>
+          <div className="columns-2 gap-8 text-[10px] leading-snug">
+            {notesByDate(notes).map(([date, dayNotes]) => (
+              <div key={date} className="mb-2 break-inside-avoid">
+                <p className="font-semibold text-slate-700">{formatDateShort(date)}</p>
+                <ul className="list-disc pl-4 text-slate-600">
+                  {dayNotes.map((n) => (
+                    <li key={n.id}><span className="font-medium text-slate-800">{n.project.code}:</span> {n.text}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
+}
+
+function notesByDate(notes: NoteWithProject[]): [string, NoteWithProject[]][] {
+  const map = new Map<string, NoteWithProject[]>();
+  for (const n of notes) map.set(n.date, [...(map.get(n.date) ?? []), n]);
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 function Kpi({ label, value, valueClass = 'text-slate-900' }: { label: string; value: string; valueClass?: string }) {

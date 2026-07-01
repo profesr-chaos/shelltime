@@ -84,6 +84,8 @@ const api = {
   reportExport: {
     exportPdf: (month: string): Promise<{ ok: boolean; filePath?: string; error?: string }> =>
       ipcRenderer.invoke('export:pdf', month),
+    exportCsv: (month: string): Promise<{ ok: boolean; filePath?: string; error?: string }> =>
+      ipcRenderer.invoke('export:csv', month),
     print: (month: string): Promise<void> => ipcRenderer.invoke('export:print', month),
   },
   overlay: {
@@ -103,6 +105,7 @@ const api = {
   app: {
     getDataPath: (): Promise<string> => ipcRenderer.invoke('app:getDataPath'),
     openDataFolder: (): Promise<void> => ipcRenderer.invoke('app:openDataFolder'),
+    backupDatabase: (): Promise<{ ok: boolean; filePath?: string; error?: string }> => ipcRenderer.invoke('backup:database'),
   },
 };
 

@@ -80,6 +80,18 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
     });
   };
 
+  const setDailyTarget = (minutes: number) => {
+    setTargetMinutes(minutes);
+    window.api.targets.setDailyOverride(date, minutes).then(() => onSaved());
+  };
+
+  const resetTarget = async () => {
+    await window.api.targets.setDailyOverride(date, null);
+    const status = await window.api.targets.getDailyStatus(date);
+    setTargetMinutes(status.targetMinutes);
+    onSaved();
+  };
+
   const save = async () => {
     setSaving(true);
     const existingProjectIds = new Set(rows.filter((r) => !r.isNew).map((r) => r.projectId));
@@ -125,6 +137,11 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
             <AlertIcon width={14} height={14} /> Under target by {minutesToHhMm(underBy)}
           </p>
         )}
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-xs font-medium text-slate-500">Target for this day</span>
+          <DurationInput minutes={targetMinutes} onChange={setDailyTarget} maxMinutes={16 * 60} />
+          <button onClick={resetTarget} className="text-xs font-medium text-amber hover:underline">Reset to default</button>
+        </div>
       </div>
 
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Time entries</p>

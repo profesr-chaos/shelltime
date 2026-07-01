@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
-import Holidays from 'date-holidays';
 import path from 'node:path';
 import fs from 'node:fs';
+import { isPublicHoliday } from './holidays';
 import type {
   Project,
   DailyEntry,
@@ -19,8 +19,8 @@ const DEFAULT_COLORS = ['#F5941E', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6', '
 
 const DEFAULT_SETTINGS: Settings = {
   defaultDailyTargetMinutes: 480,
-  monthlyTargetMode: 'auto',
   breakIntervalMinutes: 60,
+  autoPauseIdleMinutes: 10,
   grindMode: false,
   overlayAlwaysOnTop: true,
   overlayCompact: false,
@@ -93,8 +93,23 @@ export function initDb(userDataDir: string) {
     );
   `);
 
+  runMigrations();
   seedSettingsDefaults();
   seedDemoDataIfEmpty();
+}
+
+// Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
+const SCHEMA_VERSION = 2;
+function runMigrations() {
+  const current = db.pragma('user_version', { simple: true }) as number;
+  const migrations: (() => void)[] = [
+    // migrations[0]: v0 -> v1 (baseline — tables already created above, nothing to do)
+    () => {},
+    // migrations[1]: v1 -> v2 — drop the retired monthlyTargetMode setting
+    () => db.prepare("DELETE FROM settings WHERE key = 'monthlyTargetMode'").run(),
+  ];
+  for (let v = current; v < SCHEMA_VERSION; v++) migrations[v]?.();
+  if (current < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
 const DEMO_NOTES = [
@@ -143,27 +158,12 @@ function now() {
   return new Date().toISOString();
 }
 
-let holidayCache: { key: string; hd: Holidays } | null = null;
-function getHolidays(region: string): Holidays {
-  if (holidayCache?.key === region) return holidayCache.hd;
-  const [country, state] = region.split('-');
-  const hd = state ? new Holidays(country, state) : new Holidays(country);
-  holidayCache = { key: region, hd };
-  return hd;
-}
-
-function isBankHoliday(dateStr: string): boolean {
-  const settings = getSettings();
-  if (!settings.skipBankHolidays) return false;
-  // Noon avoids any timezone rollover to the previous/next day.
-  const result = getHolidays(settings.holidayRegion).isHoliday(new Date(dateStr + 'T12:00:00'));
-  return Array.isArray(result) && result.some((h) => h.type === 'public' || h.type === 'bank');
-}
-
 export function isWorkingDay(dateStr: string): boolean {
   const day = new Date(dateStr + 'T00:00:00').getDay();
-  if (!getSettings().workingDays.includes(day)) return false;
-  return !isBankHoliday(dateStr);
+  const settings = getSettings();
+  if (!settings.workingDays.includes(day)) return false;
+  if (settings.skipBankHolidays && isPublicHoliday(dateStr, settings.holidayRegion)) return false;
+  return true;
 }
 
 function workingDaysInMonth(month: string): string[] {
@@ -322,6 +322,24 @@ export function listHolidays(month: string): { date: string; minutes: number }[]
     .prepare('SELECT date, duration_minutes FROM daily_project_time WHERE project_id = ? AND date LIKE ? ORDER BY date ASC')
     .all(project.id, `${month}%`) as any[];
   return rows.map((r) => ({ date: r.date, minutes: r.duration_minutes }));
+}
+
+// ---------- data export ----------
+
+export function getEntriesForCsv(month?: string): { date: string; code: string; name: string; minutes: number; source: string }[] {
+  const clause = month ? 'WHERE dpt.date LIKE ?' : '';
+  const params = month ? [`${month}%`] : [];
+  return db
+    .prepare(
+      `SELECT dpt.date AS date, p.code AS code, p.name AS name, dpt.duration_minutes AS minutes, dpt.source AS source
+       FROM daily_project_time dpt JOIN projects p ON p.id = dpt.project_id
+       ${clause} ORDER BY dpt.date ASC, p.code ASC`
+    )
+    .all(...params) as any[];
+}
+
+export function backupDatabase(dest: string): Promise<void> {
+  return db.backup(dest).then(() => undefined);
 }
 
 // ---------- daily project time ----------

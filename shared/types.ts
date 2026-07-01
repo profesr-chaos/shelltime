@@ -33,8 +33,8 @@ export interface Note {
 
 export interface Settings {
   defaultDailyTargetMinutes: number;
-  monthlyTargetMode: 'auto' | 'override';
   breakIntervalMinutes: number;
+  autoPauseIdleMinutes: number; // pause a running timer after this many idle minutes; 0 disables
   grindMode: boolean;
   overlayAlwaysOnTop: boolean;
   overlayCompact: boolean;

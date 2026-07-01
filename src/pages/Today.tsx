@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DailyEntry, DailyTargetStatus, Note } from '@shared/types';
+import type { DailyEntry, DailyTargetStatus, Note, Project } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useTimer } from '@/hooks/useTimer';
 import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms } from '@/lib/format';
@@ -11,6 +11,7 @@ import { PencilIcon, PlusIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } fro
 import { ManualTimeModal } from '@/components/ManualTimeModal';
 import { AddEditProjectModal } from '@/components/AddEditProjectModal';
 import { DistributeDeltaModal } from '@/components/DistributeDeltaModal';
+import { NotesModal } from '@/components/NotesModal';
 
 const shiftDay = (date: string, delta: number): string => {
   const d = new Date(date + 'T00:00:00');
@@ -32,6 +33,7 @@ export function Today() {
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [distributeDelta, setDistributeDelta] = useState<number | null>(null);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
+  const [notesFor, setNotesFor] = useState<{ date: string; project: Project } | null>(null);
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
@@ -173,9 +175,13 @@ export function Today() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {noteCount > 0 && (
-                    <span className="flex items-center gap-1 text-sm text-slate-400">💬 {noteCount}</span>
-                  )}
+                  <button
+                    onClick={() => setNotesFor({ date, project })}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    title="View / add notes"
+                  >
+                    💬 {noteCount > 0 ? noteCount : ''}
+                  </button>
                   <span className={`font-mono text-lg tabular-nums ${isActive ? 'font-bold text-amber' : 'text-slate-700'}`}>
                     {secondsToHms(minutes * 60)}
                   </span>
@@ -232,6 +238,15 @@ export function Today() {
           deltaMinutes={distributeDelta}
           onClose={() => { setDistributeDelta(null); setSeekPreview(null); }}
           onSaved={load}
+        />
+      )}
+
+      {notesFor && (
+        <NotesModal
+          date={notesFor.date}
+          project={notesFor.project}
+          onClose={() => setNotesFor(null)}
+          onChanged={load}
         />
       )}
     </div>

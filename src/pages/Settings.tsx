@@ -172,6 +172,14 @@ export function Settings() {
           onChange={(v) => update({ grindMode: v })}
           label={settings.grindMode ? 'Grind mode is ON — break reminders are suppressed' : 'Grind mode'}
         />
+        <FieldWrap label="Auto-pause when idle" hint="Pause a running timer after this much inactivity (or on sleep/lock). Set to 0 to disable.">
+          <DurationInput
+            minutes={settings.autoPauseIdleMinutes}
+            onChange={(minutes) => update({ autoPauseIdleMinutes: Math.max(0, minutes) })}
+            minMinutes={0}
+            maxMinutes={2 * 60}
+          />
+        </FieldWrap>
       </Section>
 
       <Section title="Overlay">
@@ -199,7 +207,19 @@ export function Settings() {
 
       <Section title="Data">
         <p className="mb-2 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500">{dataPath}</p>
-        <Button variant="secondary" onClick={() => window.api.app.openDataFolder()}>Open data folder</Button>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={() => window.api.app.openDataFolder()}>Open data folder</Button>
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              const res = await window.api.app.backupDatabase();
+              if (res.ok) toast(`Backed up to ${res.filePath}`);
+              else if (res.error !== 'Backup cancelled') toast(res.error ?? 'Backup failed', 'error');
+            }}
+          >
+            Back up database
+          </Button>
+        </div>
       </Section>
     </div>
   );

@@ -1,7 +1,20 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, powerMonitor } from 'electron';
 import path from 'node:path';
 import * as db from './db';
 import { TimerEngine } from './timer';
+
+// Wrap every IPC handler so a thrown error is logged in the main process (and still rejects the
+// renderer promise) instead of failing silently and, e.g., leaving a screen blank.
+function handle(channel: string, listener: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await listener(event, ...args);
+    } catch (err) {
+      console.error(`IPC "${channel}" failed:`, err);
+      throw err;
+    }
+  });
+}
 
 process.env.APP_ROOT = path.join(__dirname, '..');
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
@@ -138,24 +151,41 @@ function broadcast(channel: string, ...args: unknown[]) {
   }
 }
 
+function pauseTimerForIdle() {
+  if (timer.getState().status !== 'running') return;
+  timer.pause();
+  broadcast('timer:update', timer.getState());
+}
+
+// Auto-pause a running timer when the machine goes idle/asleep/locked, so you don't bank time while away.
+function startIdleMonitor() {
+  powerMonitor.on('suspend', pauseTimerForIdle);
+  powerMonitor.on('lock-screen', pauseTimerForIdle);
+  setInterval(() => {
+    const idleMinutes = db.getSettings().autoPauseIdleMinutes;
+    if (idleMinutes <= 0) return;
+    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) pauseTimerForIdle();
+  }, 30_000);
+}
+
 function registerIpc() {
-  ipcMain.handle('projects:list', (_e, includeInactive: boolean) => db.listProjects(includeInactive));
-  ipcMain.handle('projects:create', (_e, input) => {
+  handle('projects:list', (_e, includeInactive: boolean) => db.listProjects(includeInactive));
+  handle('projects:create', (_e, input) => {
     const project = db.createProject(input);
     broadcast('projects:changed');
     return project;
   });
-  ipcMain.handle('projects:update', (_e, id, patch) => {
+  handle('projects:update', (_e, id, patch) => {
     const project = db.updateProject(id, patch);
     broadcast('projects:changed');
     return project;
   });
-  ipcMain.handle('projects:setActive', (_e, id, isActive) => {
+  handle('projects:setActive', (_e, id, isActive) => {
     const project = db.setProjectActive(id, isActive);
     broadcast('projects:changed');
     return project;
   });
-  ipcMain.handle('projects:delete', (_e, id) => {
+  handle('projects:delete', (_e, id) => {
     db.deleteProject(id);
     broadcast('projects:changed');
     if (timer.getState().activeProjectId === id) {
@@ -164,9 +194,9 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('entries:getDaily', (_e, date) => db.getDailyEntries(date));
-  ipcMain.handle('entries:getDailyTotal', (_e, date) => db.getDailyTotalMinutes(date));
-  ipcMain.handle('entries:set', (_e, date, projectId, durationMinutes, source) => {
+  handle('entries:getDaily', (_e, date) => db.getDailyEntries(date));
+  handle('entries:getDailyTotal', (_e, date) => db.getDailyTotalMinutes(date));
+  handle('entries:set', (_e, date, projectId, durationMinutes, source) => {
     const entry = db.setDailyEntry(date, projectId, durationMinutes, source);
     if (date === todayStr()) {
       timer.resyncProjectTotal(projectId);
@@ -174,14 +204,14 @@ function registerIpc() {
     }
     return entry;
   });
-  ipcMain.handle('entries:delete', (_e, date, projectId) => {
+  handle('entries:delete', (_e, date, projectId) => {
     db.deleteDailyEntry(date, projectId);
     if (date === todayStr()) {
       timer.resyncProjectTotal(projectId);
       broadcast('timer:update', timer.getState());
     }
   });
-  ipcMain.handle('entries:applyDelta', (_e, date, projectIds, deltaMinutes) => {
+  handle('entries:applyDelta', (_e, date, projectIds, deltaMinutes) => {
     // Persist any in-flight timer seconds first so this relative delta lands on an up-to-date base.
     if (date === todayStr()) timer.flushActive();
     db.applyTimeDelta(date, projectIds, deltaMinutes);
@@ -191,25 +221,25 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('holidays:list', (_e, month) => db.listHolidays(month));
-  ipcMain.handle('holidays:add', (_e, date) => {
+  handle('holidays:list', (_e, month) => db.listHolidays(month));
+  handle('holidays:add', (_e, date) => {
     const entry = db.addHoliday(date);
     broadcast('projects:changed'); // the HOLIDAY project may have just been created
     if (date === todayStr()) broadcast('timer:update', timer.getState());
     return entry;
   });
-  ipcMain.handle('holidays:remove', (_e, date) => {
+  handle('holidays:remove', (_e, date) => {
     db.removeHoliday(date);
     if (date === todayStr()) broadcast('timer:update', timer.getState());
   });
 
-  ipcMain.handle('notes:list', (_e, date, projectId) => db.listNotes(date, projectId));
-  ipcMain.handle('notes:add', (_e, date, projectId, text) => db.addNote(date, projectId, text));
-  ipcMain.handle('notes:update', (_e, id, text) => db.updateNote(id, text));
-  ipcMain.handle('notes:delete', (_e, id) => db.deleteNote(id));
+  handle('notes:list', (_e, date, projectId) => db.listNotes(date, projectId));
+  handle('notes:add', (_e, date, projectId, text) => db.addNote(date, projectId, text));
+  handle('notes:update', (_e, id, text) => db.updateNote(id, text));
+  handle('notes:delete', (_e, id) => db.deleteNote(id));
 
-  ipcMain.handle('settings:get', () => db.getSettings());
-  ipcMain.handle('settings:update', (_e, patch) => {
+  handle('settings:get', () => db.getSettings());
+  handle('settings:update', (_e, patch) => {
     const updated = db.updateSettings(patch);
     if ('startWithWindows' in patch) {
       app.setLoginItemSettings({ openAtLogin: !!patch.startWithWindows });
@@ -225,34 +255,34 @@ function registerIpc() {
     return updated;
   });
 
-  ipcMain.handle('targets:getDailyStatus', (_e, date) => db.getDailyTargetStatus(date));
-  ipcMain.handle('targets:setDailyOverride', (_e, date, minutes) => db.setDailyTargetOverride(date, minutes));
-  ipcMain.handle('targets:getMonthly', (_e, month) => db.getMonthlyTargetMinutes(month));
-  ipcMain.handle('targets:setMonthlyOverride', (_e, month, minutes) => db.setMonthlyTargetOverride(month, minutes));
+  handle('targets:getDailyStatus', (_e, date) => db.getDailyTargetStatus(date));
+  handle('targets:setDailyOverride', (_e, date, minutes) => db.setDailyTargetOverride(date, minutes));
+  handle('targets:getMonthly', (_e, month) => db.getMonthlyTargetMinutes(month));
+  handle('targets:setMonthlyOverride', (_e, month, minutes) => db.setMonthlyTargetOverride(month, minutes));
 
-  ipcMain.handle('timer:getState', () => timer.getState());
-  ipcMain.handle('timer:start', (_e, projectId) => {
+  handle('timer:getState', () => timer.getState());
+  handle('timer:start', (_e, projectId) => {
     timer.start(projectId);
     broadcast('timer:update', timer.getState());
   });
-  ipcMain.handle('timer:pause', () => {
+  handle('timer:pause', () => {
     timer.pause();
     broadcast('timer:update', timer.getState());
   });
-  ipcMain.handle('timer:resume', () => {
+  handle('timer:resume', () => {
     timer.resume();
     broadcast('timer:update', timer.getState());
   });
-  ipcMain.handle('timer:switch', (_e, projectId) => {
+  handle('timer:switch', (_e, projectId) => {
     timer.switchProject(projectId);
     broadcast('timer:update', timer.getState());
   });
-  ipcMain.handle('timer:snoozeBreak', () => timer.resetBreakClock());
+  handle('timer:snoozeBreak', () => timer.resetBreakClock());
 
-  ipcMain.handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
-  ipcMain.handle('notes:listForMonth', (_e, month) => db.listNotesForMonth(month));
+  handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
+  handle('notes:listForMonth', (_e, month) => db.listNotesForMonth(month));
 
-  ipcMain.handle('export:pdf', async (_e, month) => {
+  handle('export:pdf', async (_e, month) => {
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
       title: 'Export monthly report',
       defaultPath: `Shelltime-${month}.pdf`,
@@ -274,7 +304,35 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('export:print', async (_e, month) => {
+  handle('export:csv', async (_e, month: string) => {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
+      title: 'Export tracked time (CSV)',
+      defaultPath: `Shelltime-${month}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
+    const rows = db.getEntriesForCsv(month);
+    const esc = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = ['Date,Project Code,Project Name,Hours,Source']
+      .concat(rows.map((r) => [r.date, esc(r.code), esc(r.name), (r.minutes / 60).toFixed(2), r.source].join(',')))
+      .join('\r\n');
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(filePath, csv, 'utf8');
+    return { ok: true, filePath };
+  });
+
+  handle('backup:database', async () => {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
+      title: 'Back up database',
+      defaultPath: `shelltime-backup-${todayStr()}.db`,
+      filters: [{ name: 'SQLite database', extensions: ['db'] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: 'Backup cancelled' };
+    await db.backupDatabase(filePath);
+    return { ok: true, filePath };
+  });
+
+  handle('export:print', async (_e, month) => {
     const printWin = new BrowserWindow({ show: false, webPreferences: { preload: path.join(__dirname, 'preload.js') } });
     loadWindow(printWin, 'index.html', `?print=${month}`);
     await new Promise((resolve) => printWin.webContents.once('did-finish-load', () => resolve(undefined)));
@@ -282,32 +340,32 @@ function registerIpc() {
     printWin.webContents.print({ printBackground: true, landscape: true }, () => printWin.destroy());
   });
 
-  ipcMain.handle('overlay:setCompact', (_e, compact) => {
+  handle('overlay:setCompact', (_e, compact) => {
     db.updateSettings({ overlayCompact: compact });
     resizeOverlayWindow(compact ? 340 : 320, compact ? 44 : 220);
     broadcast('overlay:compactChanged', compact);
   });
   // Temporarily grow/shrink the overlay height (e.g. to show the compact-mode switch dropdown) without changing compact state.
-  ipcMain.handle('overlay:setHeight', (_e, height: number) => {
+  handle('overlay:setHeight', (_e, height: number) => {
     if (!overlayWindow) return;
     const [w] = overlayWindow.getSize();
     resizeOverlayWindow(w, Math.round(height));
   });
-  ipcMain.handle('overlay:openMainWindow', () => {
+  handle('overlay:openMainWindow', () => {
     mainWindow?.show();
     mainWindow?.focus();
   });
-  ipcMain.handle('overlay:show', () => {
+  handle('overlay:show', () => {
     if (!overlayWindow) return;
     overlayWindow.show();
     const settings = db.getSettings();
     resizeOverlayWindow(settings.overlayCompact ? 340 : 320, settings.overlayCompact ? 44 : 220);
     overlayWindow.setOpacity(settings.overlayOpacity);
   });
-  ipcMain.handle('overlay:hide', () => overlayWindow?.hide());
+  handle('overlay:hide', () => overlayWindow?.hide());
 
-  ipcMain.handle('app:getDataPath', () => app.getPath('userData'));
-  ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
+  handle('app:getDataPath', () => app.getPath('userData'));
+  handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
 }
 
 app.whenReady().then(() => {
@@ -327,6 +385,7 @@ app.whenReady().then(() => {
   createOverlayWindow();
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
+  startIdleMonitor();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
@@ -336,6 +395,8 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   (app as any).isQuitting = true;
+  // Persist any in-flight timer seconds so quitting mid-session doesn't lose them.
+  timer?.flushActive();
 });
 
 app.on('window-all-closed', () => {
