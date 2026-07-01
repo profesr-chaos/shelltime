@@ -64,7 +64,7 @@ export function Settings() {
       <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
 
       <Section title="Working schedule">
-        <FieldWrap label="Working days" hint={`${settings.workingDays.length} days a week — used to calculate expected weekly/monthly hours`}>
+        <FieldWrap label="Working days" hint={`${settings.workingDays.length} days a week - used to calculate expected weekly/monthly hours`}>
           <div className="flex gap-2">
             {DAYS.map(({ day, label }) => {
               const selected = settings.workingDays.includes(day);
@@ -185,7 +185,7 @@ export function Settings() {
         <Toggle
           checked={settings.grindMode}
           onChange={(v) => update({ grindMode: v })}
-          label={settings.grindMode ? 'Grind mode is ON — break reminders are suppressed' : 'Grind mode'}
+          label={settings.grindMode ? 'Grind mode is ON - break reminders are suppressed' : 'Grind mode'}
         />
         <FieldWrap label="Auto-pause when idle" hint="Pause a running timer after this much inactivity (or on sleep/lock). Set to 0 to disable.">
           <DurationInput
