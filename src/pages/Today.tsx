@@ -5,7 +5,7 @@ import { useTimer } from '@/hooks/useTimer';
 import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { Button, IconButton } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
 import { PencilIcon, PlusIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
 import { ManualTimeModal } from '@/components/ManualTimeModal';
@@ -121,11 +121,6 @@ export function Today() {
           <p className="mt-1 text-sm text-slate-500">
             {weekday} · Workday {workdayNumberOfYear(date)} of {new Date(date).getFullYear()}
           </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="primary" icon={<PlusIcon />} onClick={() => setEditEntry('new')}>
-            New Entry
-          </Button>
         </div>
       </div>
 
