@@ -222,14 +222,8 @@ function registerIpc() {
   });
 
   handle('holidays:list', (_e, month) => db.listHolidays(month));
-  handle('holidays:add', (_e, date) => {
-    const entry = db.addHoliday(date);
-    broadcast('projects:changed'); // the HOLIDAY project may have just been created
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
-    return entry;
-  });
-  handle('holidays:addRange', (_e, start: string, end: string) => {
-    const booked = db.addHolidayRange(start, end);
+  handle('holidays:addRange', (_e, start: string, end: string, half: boolean) => {
+    const booked = db.addHolidayRange(start, end, half ? 0.5 : 1);
     if (booked.length) broadcast('projects:changed'); // the HOLIDAY project may have just been created
     if (booked.includes(todayStr())) broadcast('timer:update', timer.getState());
     return booked;

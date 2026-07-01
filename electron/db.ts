@@ -305,9 +305,9 @@ function ensureHolidayProject(): Project {
   return setProjectActive(created.id, false); // keep it out of timing lists
 }
 
-export function addHoliday(date: string): DailyEntry {
+export function addHoliday(date: string, fraction = 1): DailyEntry {
   const project = ensureHolidayProject();
-  return setDailyEntry(date, project.id, getDailyTargetMinutes(date), 'manual');
+  return setDailyEntry(date, project.id, getDailyTargetMinutes(date) * fraction, 'manual');
 }
 
 export function removeHoliday(date: string): void {
@@ -317,7 +317,7 @@ export function removeHoliday(date: string): void {
 
 // Books every working day in [startDate, endDate] (inclusive) as a holiday, skipping weekends and
 // bank holidays. Order-independent. Returns the dates actually booked.
-export function addHolidayRange(startDate: string, endDate: string): string[] {
+export function addHolidayRange(startDate: string, endDate: string, fraction = 1): string[] {
   const [from, to] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
   const booked: string[] = [];
   const cursor = new Date(from + 'T00:00:00');
@@ -325,7 +325,7 @@ export function addHolidayRange(startDate: string, endDate: string): string[] {
   while (cursor <= end) {
     const ds = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
     if (isWorkingDay(ds)) {
-      addHoliday(ds);
+      addHoliday(ds, fraction);
       booked.push(ds);
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -333,13 +333,13 @@ export function addHolidayRange(startDate: string, endDate: string): string[] {
   return booked;
 }
 
-export function listHolidays(month: string): { date: string; minutes: number }[] {
+export function listHolidays(month: string): { date: string; minutes: number; targetMinutes: number }[] {
   const project = getProjectByCode(HOLIDAY_CODE);
   if (!project) return [];
   const rows = db
     .prepare('SELECT date, duration_minutes FROM daily_project_time WHERE project_id = ? AND date LIKE ? ORDER BY date ASC')
     .all(project.id, `${month}%`) as any[];
-  return rows.map((r) => ({ date: r.date, minutes: r.duration_minutes }));
+  return rows.map((r) => ({ date: r.date, minutes: r.duration_minutes, targetMinutes: getDailyTargetMinutes(r.date) }));
 }
 
 // ---------- data export ----------
