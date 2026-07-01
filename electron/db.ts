@@ -466,30 +466,13 @@ export function getDailyTargetStatus(date: string) {
   return { date, targetMinutes: target, trackedMinutes: tracked, status: dayStatus(tracked, target) };
 }
 
-export function fillRestOfDayPreview(date: string) {
-  const target = getDailyTargetMinutes(date);
-  const tracked = getDailyTotalMinutes(date);
-  const toAdd = Math.max(0, target - tracked);
-  return { targetMinutes: target, trackedMinutes: tracked, toAddMinutes: toAdd };
-}
-
-export function fillRestOfDay(date: string, projectId: number) {
-  const preview = fillRestOfDayPreview(date);
-  if (preview.toAddMinutes <= 0) return { addedMinutes: 0, entry: null };
-  const entry = addTimeToProject(date, projectId, preview.toAddMinutes, 'fill-rest-of-day');
-  return { addedMinutes: preview.toAddMinutes, entry };
-}
-
-export function fillRestOfDaySplit(date: string, projectIds: number[]) {
-  const preview = fillRestOfDayPreview(date);
-  if (preview.toAddMinutes <= 0 || projectIds.length === 0) return { addedMinutes: 0 };
-  const share = Math.floor(preview.toAddMinutes / projectIds.length);
-  const remainder = Math.round(preview.toAddMinutes - share * projectIds.length);
-  projectIds.forEach((projectId, i) => {
-    const minutes = share + (i < remainder ? 1 : 0);
-    if (minutes > 0) addTimeToProject(date, projectId, minutes, 'fill-rest-of-day');
-  });
-  return { addedMinutes: preview.toAddMinutes };
+/** Splits an arbitrary (positive or negative) minute delta evenly across the given projects. */
+export function applyTimeDelta(date: string, projectIds: number[], deltaMinutes: number): void {
+  if (projectIds.length === 0 || deltaMinutes === 0) return;
+  const share = deltaMinutes / projectIds.length;
+  for (const projectId of projectIds) {
+    addTimeToProject(date, projectId, share, 'manual');
+  }
 }
 
 // ---------- monthly summary ----------

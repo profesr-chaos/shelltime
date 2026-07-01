@@ -106,7 +106,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
               </span>
             </div>
           )}
-          <p className="mt-3 text-xs text-slate-400">Under-target days are clickable - edit timings to correct.</p>
+          <p className="mt-3 text-xs text-slate-400">Click any day to edit its timings.</p>
         </div>
       </div>
 

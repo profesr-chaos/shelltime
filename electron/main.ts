@@ -54,7 +54,7 @@ function createMainWindow() {
 function createOverlayWindow() {
   const settings = db.getSettings();
   const pos = settings.overlayPosition;
-  const size = settings.overlayCompact ? { width: 340, height: 60 } : { width: 320, height: 220 };
+  const size = settings.overlayCompact ? { width: 340, height: 44 } : { width: 320, height: 220 };
 
   overlayWindow = new BrowserWindow({
     ...size,
@@ -168,23 +168,25 @@ function registerIpc() {
   ipcMain.handle('entries:getDailyTotal', (_e, date) => db.getDailyTotalMinutes(date));
   ipcMain.handle('entries:set', (_e, date, projectId, durationMinutes, source) => {
     const entry = db.setDailyEntry(date, projectId, durationMinutes, source);
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
+    if (date === todayStr()) {
+      timer.resyncProjectTotal(projectId);
+      broadcast('timer:update', timer.getState());
+    }
     return entry;
   });
   ipcMain.handle('entries:delete', (_e, date, projectId) => {
     db.deleteDailyEntry(date, projectId);
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
+    if (date === todayStr()) {
+      timer.resyncProjectTotal(projectId);
+      broadcast('timer:update', timer.getState());
+    }
   });
-  ipcMain.handle('entries:fillPreview', (_e, date) => db.fillRestOfDayPreview(date));
-  ipcMain.handle('entries:fill', (_e, date, projectId) => {
-    const result = db.fillRestOfDay(date, projectId);
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
-    return result;
-  });
-  ipcMain.handle('entries:fillSplit', (_e, date, projectIds) => {
-    const result = db.fillRestOfDaySplit(date, projectIds);
-    if (date === todayStr()) broadcast('timer:update', timer.getState());
-    return result;
+  ipcMain.handle('entries:applyDelta', (_e, date, projectIds, deltaMinutes) => {
+    db.applyTimeDelta(date, projectIds, deltaMinutes);
+    if (date === todayStr()) {
+      for (const projectId of projectIds as number[]) timer.resyncProjectTotal(projectId);
+      broadcast('timer:update', timer.getState());
+    }
   });
 
   ipcMain.handle('notes:list', (_e, date, projectId) => db.listNotes(date, projectId));
@@ -201,7 +203,7 @@ function registerIpc() {
     if (overlayWindow) {
       if ('overlayAlwaysOnTop' in patch) overlayWindow.setAlwaysOnTop(!!patch.overlayAlwaysOnTop, 'screen-saver');
       if ('overlayCompact' in patch) {
-        resizeOverlayWindow(patch.overlayCompact ? 340 : 320, patch.overlayCompact ? 60 : 220);
+        resizeOverlayWindow(patch.overlayCompact ? 340 : 320, patch.overlayCompact ? 44 : 220);
         broadcast('overlay:compactChanged', patch.overlayCompact);
       }
       if ('overlayOpacity' in patch) overlayWindow.setOpacity(updated.overlayOpacity);
@@ -268,8 +270,14 @@ function registerIpc() {
 
   ipcMain.handle('overlay:setCompact', (_e, compact) => {
     db.updateSettings({ overlayCompact: compact });
-    resizeOverlayWindow(compact ? 340 : 320, compact ? 60 : 220);
+    resizeOverlayWindow(compact ? 340 : 320, compact ? 44 : 220);
     broadcast('overlay:compactChanged', compact);
+  });
+  // Temporarily grow/shrink the overlay height (e.g. to show the compact-mode switch dropdown) without changing compact state.
+  ipcMain.handle('overlay:setHeight', (_e, height: number) => {
+    if (!overlayWindow) return;
+    const [w] = overlayWindow.getSize();
+    resizeOverlayWindow(w, Math.round(height));
   });
   ipcMain.handle('overlay:openMainWindow', () => {
     mainWindow?.show();
@@ -279,7 +287,7 @@ function registerIpc() {
     if (!overlayWindow) return;
     overlayWindow.show();
     const settings = db.getSettings();
-    resizeOverlayWindow(settings.overlayCompact ? 340 : 320, settings.overlayCompact ? 60 : 220);
+    resizeOverlayWindow(settings.overlayCompact ? 340 : 320, settings.overlayCompact ? 44 : 220);
     overlayWindow.setOpacity(settings.overlayOpacity);
   });
   ipcMain.handle('overlay:hide', () => overlayWindow?.hide());

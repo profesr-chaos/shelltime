@@ -41,6 +41,20 @@ export class TimerEngine {
     return (Date.now() - this.sessionStartedAt) / 1000;
   }
 
+  private committedSecondsFor(projectId: number): number {
+    const minutes = db.getDailyEntries(this.currentDate).find((e) => e.projectId === projectId)?.durationMinutes ?? 0;
+    return minutes * 60;
+  }
+
+  /** Re-baseline the running total for a project after its stored time was changed directly (e.g. a manual edit),
+   * so the live display doesn't drift from what's actually in the database. */
+  resyncProjectTotal(projectId: number) {
+    if (this.activeProjectId !== projectId) return;
+    this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
+    if (this.status === 'running') this.sessionStartedAt = Date.now();
+    this.emit();
+  }
+
   private flush() {
     try {
       this.rolloverDayIfNeeded();
@@ -101,8 +115,7 @@ export class TimerEngine {
     this.activeProjectId = projectId;
     this.status = 'running';
     this.sessionStartedAt = Date.now();
-    this.accumulatedSecondsToday = db.getDailyEntries(this.currentDate).find((e) => e.projectId === projectId)?.durationMinutes ?? 0;
-    this.accumulatedSecondsToday *= 60;
+    this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
     this.resetBreakClock();
     this.emit();
   }

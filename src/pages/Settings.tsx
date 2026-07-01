@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
 import { OVERLAY_OPACITY_FLOOR } from '@shared/types';
 import { Toggle, TextInput, FieldWrap } from '@/components/ui/Inputs';
@@ -24,6 +24,7 @@ export function Settings() {
   const [monthlyOverrideHours, setMonthlyOverrideHours] = useState('40');
   const toast = useToast();
   const month = currentMonthStr();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     window.api.settings.get().then(setSettings);
@@ -36,6 +37,14 @@ export function Settings() {
   const update = (patch: Partial<SettingsType>) => {
     setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
     window.api.settings.update(patch).then(() => toast('Settings saved'));
+  };
+
+  const updateDebounced = (patch: Partial<SettingsType>) => {
+    setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      window.api.settings.update(patch).then(() => toast('Settings saved'));
+    }, 500);
   };
 
   return (
@@ -141,7 +150,7 @@ export function Settings() {
               max={100}
               step={5}
               value={Math.round(settings.overlayOpacity * 100)}
-              onChange={(e) => update({ overlayOpacity: Number(e.target.value) / 100 })}
+              onChange={(e) => updateDebounced({ overlayOpacity: Number(e.target.value) / 100 })}
               className="h-2 flex-1 accent-amber-500"
             />
             <span className="w-12 text-right text-sm font-medium text-slate-700">{Math.round(settings.overlayOpacity * 100)}%</span>

@@ -9,7 +9,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export type EntrySource = 'timer' | 'manual' | 'fill-rest-of-day';
+export type EntrySource = 'timer' | 'manual';
 
 export interface DailyEntry {
   id: number;
@@ -101,8 +101,3 @@ export interface MonthlySummary {
   insights: MonthlyInsights;
 }
 
-export interface FillRestOfDayPreview {
-  targetMinutes: number;
-  trackedMinutes: number;
-  toAddMinutes: number;
-}

@@ -1,0 +1,97 @@
+import { useEffect, useState } from 'react';
+import type { Project, DailyEntry } from '@shared/types';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
+import { ColorDot } from './ui/Badge';
+import { minutesToHhMm, signedHoursLabel } from '@/lib/format';
+import { useToast } from './ui/Toast';
+
+interface DistributeDeltaModalProps {
+  date: string;
+  projects: Project[];
+  deltaMinutes: number;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export function DistributeDeltaModal({ date, projects, deltaMinutes, onClose, onSaved }: DistributeDeltaModalProps) {
+  const active = projects.filter((p) => p.isActive);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [minutesByProject, setMinutesByProject] = useState<Map<number, number>>(new Map());
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    window.api.entries.getDaily(date).then((entries: DailyEntry[]) => {
+      setMinutesByProject(new Map(entries.map((e) => [e.projectId, e.durationMinutes])));
+    });
+  }, [date]);
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirm = async () => {
+    if (selectedIds.size === 0) return;
+    setSaving(true);
+    await window.api.entries.applyDelta(date, [...selectedIds], deltaMinutes);
+    setSaving(false);
+    toast('Time reassigned');
+    onSaved();
+    onClose();
+  };
+
+  const isIncrease = deltaMinutes > 0;
+
+  return (
+    <Modal
+      title="Reassign Tracked Time"
+      subtitle={`You moved the marker ${isIncrease ? 'up' : 'down'} by ${minutesToHhMm(Math.abs(deltaMinutes))}. Choose which projects share the change.`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={confirm} disabled={saving || selectedIds.size === 0}>Save</Button>
+        </>
+      }
+    >
+      <div className="mb-4 rounded-xl bg-slate-50 py-3 text-center">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delta</p>
+        <p className={`mt-1 text-lg font-bold ${isIncrease ? 'text-emerald-600' : 'text-red-500'}`}>
+          {signedHoursLabel(deltaMinutes)}
+        </p>
+      </div>
+
+      <p className="mb-2 text-sm font-medium text-slate-700">Split between</p>
+      <div className="flex flex-col gap-1.5">
+        {active.map((p) => (
+          <label key={p.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={selectedIds.has(p.id)}
+              onChange={() => toggleSelected(p.id)}
+              className="h-4 w-4 accent-amber-500"
+            />
+            <ColorDot color={p.color} />
+            <span className="text-sm font-medium text-slate-800">{p.code}</span>
+            <span className="min-w-0 flex-1 truncate text-sm text-slate-400">{p.name}</span>
+            <span className="ml-auto shrink-0 font-mono text-sm tabular-nums text-slate-500">
+              {minutesToHhMm(minutesByProject.get(p.id) ?? 0)}
+            </span>
+          </label>
+        ))}
+        {active.length === 0 && <p className="px-2 py-1.5 text-sm text-slate-400">No active projects</p>}
+      </div>
+      {selectedIds.size > 0 && (
+        <p className="mt-3 text-xs text-slate-400">
+          Each selected project {isIncrease ? 'gains' : 'loses'} ~{minutesToHhMm(Math.abs(deltaMinutes) / selectedIds.size)}.
+        </p>
+      )}
+    </Modal>
+  );
+}

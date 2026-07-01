@@ -7,12 +7,20 @@ import { StatCard } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Button, IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
-import { PencilIcon, PlusIcon, PlayIcon, CloseIcon } from '@/components/icons';
+import { PencilIcon, PlusIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
 import { ManualTimeModal } from '@/components/ManualTimeModal';
-import { FillRestOfDayModal } from '@/components/FillRestOfDayModal';
+import { AddEditProjectModal } from '@/components/AddEditProjectModal';
+import { DistributeDeltaModal } from '@/components/DistributeDeltaModal';
+
+const shiftDay = (date: string, delta: number): string => {
+  const d = new Date(date + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export function Today() {
-  const date = todayIso();
+  const [date, setDate] = useState(todayIso());
+  const isToday = date === todayIso();
   const { projects, refresh: refreshProjects } = useProjects(false);
   const { state: timerState, liveActiveSeconds, start, switchProject } = useTimer();
 
@@ -21,7 +29,9 @@ export function Today() {
   const [yesterdayMinutes, setYesterdayMinutes] = useState(0);
   const [notesByProject, setNotesByProject] = useState<Map<number, number>>(new Map());
   const [editEntry, setEditEntry] = useState<DailyEntry | 'new' | null>(null);
-  const [fillOpen, setFillOpen] = useState(false);
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [distributeDelta, setDistributeDelta] = useState<number | null>(null);
+  const [seekPreview, setSeekPreview] = useState<number | null>(null);
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
@@ -45,24 +55,25 @@ export function Today() {
     if (timerState.status !== 'idle') load();
   }, [timerState.status, timerState.activeProjectId, load]);
 
-  const trackedMinutes = entries.reduce((s, e) => s + (e.projectId === timerState.activeProjectId ? 0 : e.durationMinutes), 0)
-    + (timerState.activeProjectId !== null ? liveActiveSeconds / 60 : 0);
+  const trackedMinutes = isToday
+    ? entries.reduce((s, e) => s + (e.projectId === timerState.activeProjectId ? 0 : e.durationMinutes), 0)
+      + (timerState.activeProjectId !== null ? liveActiveSeconds / 60 : 0)
+    : entries.reduce((s, e) => s + e.durationMinutes, 0);
 
   const targetMinutes = target?.targetMinutes ?? 480;
   const remainingMinutes = Math.max(0, targetMinutes - trackedMinutes);
   const pct = targetMinutes > 0 ? trackedMinutes / targetMinutes : 0;
 
   const rows = projects.map((project) => {
-    const isActive = project.id === timerState.activeProjectId && timerState.status === 'running';
+    const isActive = isToday && project.id === timerState.activeProjectId && timerState.status === 'running';
     const entry = entries.find((e) => e.projectId === project.id);
     const minutes = isActive ? liveActiveSeconds / 60 : entry?.durationMinutes ?? 0;
     return { project, isActive, minutes, hasEntry: (entry?.durationMinutes ?? 0) > 0 };
   });
 
   rows.sort((a, b) => {
-    const aMinutes = Math.floor(a.minutes);
-    const bMinutes = Math.floor(b.minutes);
-    if (aMinutes !== bMinutes) return bMinutes - aMinutes;
+    // Compare by actual tracked time (seconds precision) so 00:00:14 outranks 00:00:09 outranks 00:00:00.
+    if (Math.abs(a.minutes - b.minutes) > 1e-6) return b.minutes - a.minutes;
     if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     return a.project.code.localeCompare(b.project.code);
   });
@@ -73,16 +84,37 @@ export function Today() {
   const weekday = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
   const monthDay = formatMonthDay(date);
 
-  const removeEntry = (projectId: number, code: string) => {
-    if (!window.confirm(`Remove ${code} from today's distribution? This deletes its tracked time for today.`)) return;
-    window.api.entries.delete(date, projectId).then(load);
+  const handleSeek = (newFraction: number) => {
+    const newTracked = newFraction * targetMinutes;
+    const delta = Math.round(newTracked - trackedMinutes);
+    if (delta === 0) return;
+    setSeekPreview(newFraction);
+    setDistributeDelta(delta);
   };
 
   return (
     <div>
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Today, {monthDay}</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setDate((d) => shiftDay(d, -1))} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" title="Previous day">
+              <ChevronLeftIcon />
+            </button>
+            <h1 className="text-2xl font-bold text-slate-900">{isToday ? 'Today, ' : ''}{monthDay}</h1>
+            <button
+              onClick={() => setDate((d) => shiftDay(d, 1))}
+              disabled={isToday}
+              className="rounded-lg p-1.5 text-slate-400 enabled:hover:bg-slate-100 disabled:opacity-30"
+              title="Next day"
+            >
+              <ChevronRightIcon />
+            </button>
+            {!isToday && (
+              <button onClick={() => setDate(todayIso())} className="ml-1 rounded-lg px-2 py-1 text-xs font-medium text-amber hover:bg-amber-50">
+                Jump to today
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-500">
             {weekday} · Workday {workdayNumberOfYear(date)} of {new Date(date).getFullYear()}
           </p>
@@ -100,7 +132,7 @@ export function Today() {
         <StatCard label="Remaining" value={minutesToHhMm(remainingMinutes)} delta={remainingDeltaPct !== null ? `${remainingDeltaPct}%` : undefined} deltaTone={remainingMinutes <= 0 ? 'good' : 'bad'} />
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 w-full">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="font-medium text-slate-700">
             {minutesToHhMm(trackedMinutes)} / {minutesToHhMm(targetMinutes)}
@@ -109,24 +141,20 @@ export function Today() {
             {remainingMinutes <= 0 ? 'Target reached' : `${Math.round(pct * 100)}% · ${minutesToHhMm(remainingMinutes)} remaining`}
           </span>
         </div>
-        <ProgressBar fraction={pct} tone="amber" paused={timerState.status === 'paused'} />
-        {remainingMinutes > 0 && (
-          <button onClick={() => setFillOpen(true)} className="mt-3 text-sm font-medium text-amber hover:underline">
-            Fill rest of day
-          </button>
-        )}
+        <ProgressBar fraction={pct} tone="amber" paused={timerState.status === 'paused'} onSeek={handleSeek} previewFraction={seekPreview} />
+        <p className="mt-3 text-xs text-slate-400">Drag the snail to reassign tracked time between projects.</p>
       </div>
 
       <div className="mt-10">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">Project Distribution</h2>
-          <IconButton label="Add project to today" onClick={() => setEditEntry('new')} className="h-8 w-8">
+          <h2 className="text-lg font-bold text-slate-900">Projects</h2>
+          <IconButton label="Add new project" onClick={() => setAddProjectOpen(true)} className="h-8 w-8">
             <PlusIcon width={16} height={16} />
           </IconButton>
         </div>
         <div className="flex flex-col gap-3">
           {rows.length === 0 && <p className="text-sm text-slate-400">No active projects yet — add one from the Projects page.</p>}
-          {rows.map(({ project, isActive, minutes, hasEntry }) => {
+          {rows.map(({ project, isActive, minutes }) => {
             const noteCount = notesByProject.get(project.id) ?? 0;
             const entry = entries.find((e) => e.projectId === project.id);
             return (
@@ -150,7 +178,7 @@ export function Today() {
                   <span className={`font-mono text-lg tabular-nums ${isActive ? 'font-bold text-amber' : 'text-slate-700'}`}>
                     {secondsToHms(minutes * 60)}
                   </span>
-                  {!isActive && (
+                  {isToday && !isActive && (
                     <IconButton
                       label="Start timing this project"
                       variant="primary"
@@ -161,21 +189,12 @@ export function Today() {
                     </IconButton>
                   )}
                   <IconButton
-                    label="Edit entry"
+                    label="Edit time"
                     onClick={() => setEditEntry(entry ?? { id: 0, date, projectId: project.id, durationMinutes: 0, source: 'manual', createdAt: '', updatedAt: '', project })}
                     className="h-8 w-8"
                   >
                     <PencilIcon width={16} height={16} />
                   </IconButton>
-                  {!isActive && hasEntry && (
-                    <IconButton
-                      label="Remove from today"
-                      onClick={() => removeEntry(project.id, project.code)}
-                      className="h-8 w-8"
-                    >
-                      <CloseIcon width={16} height={16} />
-                    </IconButton>
-                  )}
                 </div>
               </div>
             );
@@ -198,8 +217,21 @@ export function Today() {
         />
       )}
 
-      {fillOpen && (
-        <FillRestOfDayModal date={date} projects={projects} onClose={() => setFillOpen(false)} onSaved={load} />
+      {addProjectOpen && (
+        <AddEditProjectModal
+          onClose={() => setAddProjectOpen(false)}
+          onSaved={refreshProjects}
+        />
+      )}
+
+      {distributeDelta !== null && (
+        <DistributeDeltaModal
+          date={date}
+          projects={projects}
+          deltaMinutes={distributeDelta}
+          onClose={() => { setDistributeDelta(null); setSeekPreview(null); }}
+          onSaved={load}
+        />
       )}
     </div>
   );

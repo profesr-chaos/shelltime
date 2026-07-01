@@ -150,6 +150,19 @@ export const CloseIcon = (p: SVGProps<SVGSVGElement>) => (
   </Svg>
 );
 
+export const CheckIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M20 6L9 17l-5-5" />
+  </Svg>
+);
+
+export const UndoIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Svg {...p}>
+    <path d="M3 7v6h6" />
+    <path d="M3 13a9 9 0 1 0 3-6.7L3 9" />
+  </Svg>
+);
+
 export const CoffeeIcon = (p: SVGProps<SVGSVGElement>) => (
   <Svg {...p}>
     <path d="M18 8h1a4 4 0 010 8h-1" />

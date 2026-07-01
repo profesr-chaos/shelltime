@@ -4,6 +4,7 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select, FieldWrap } from './ui/Inputs';
 import { DurationInput } from './ui/DurationInput';
+import { ColorDot } from './ui/Badge';
 import { useToast } from './ui/Toast';
 
 interface ManualTimeModalProps {
@@ -18,6 +19,7 @@ interface ManualTimeModalProps {
 
 export function ManualTimeModal({ date, mode, projects, initialProjectId, currentMinutes = 0, onClose, onSaved }: ManualTimeModalProps) {
   const active = projects.filter((p) => p.isActive || p.id === initialProjectId);
+  const editingProject = projects.find((p) => p.id === initialProjectId);
   const [projectId, setProjectId] = useState<number | ''>(initialProjectId ?? active[0]?.id ?? '');
   const [minutes, setMinutes] = useState(mode === 'edit' ? currentMinutes : 0);
   const [saving, setSaving] = useState(false);
@@ -55,13 +57,21 @@ export function ManualTimeModal({ date, mode, projects, initialProjectId, curren
     >
       <div className="flex flex-col gap-4">
         <FieldWrap label="Project">
-          <Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))} disabled={mode === 'edit'}>
-            {active.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </Select>
+          {mode === 'edit' && editingProject ? (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <ColorDot color={editingProject.color} />
+              <span className="text-sm font-medium text-slate-800">{editingProject.code}</span>
+              <span className="text-sm text-slate-400">{editingProject.name}</span>
+            </div>
+          ) : (
+            <Select value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>
+              {active.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </option>
+              ))}
+            </Select>
+          )}
         </FieldWrap>
         <FieldWrap label={mode === 'add' ? 'Time to add' : 'Total duration'}>
           <DurationInput minutes={minutes} onChange={setMinutes} />

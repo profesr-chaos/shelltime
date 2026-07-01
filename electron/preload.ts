@@ -31,9 +31,8 @@ const api = {
     set: (date: string, projectId: number, durationMinutes: number, source: EntrySource): Promise<DailyEntry> =>
       ipcRenderer.invoke('entries:set', date, projectId, durationMinutes, source),
     delete: (date: string, projectId: number): Promise<void> => ipcRenderer.invoke('entries:delete', date, projectId),
-    fillPreview: (date: string) => ipcRenderer.invoke('entries:fillPreview', date),
-    fill: (date: string, projectId: number) => ipcRenderer.invoke('entries:fill', date, projectId),
-    fillSplit: (date: string, projectIds: number[]) => ipcRenderer.invoke('entries:fillSplit', date, projectIds),
+    applyDelta: (date: string, projectIds: number[], deltaMinutes: number): Promise<void> =>
+      ipcRenderer.invoke('entries:applyDelta', date, projectIds, deltaMinutes),
   },
   notes: {
     list: (date: string, projectId?: number): Promise<Note[]> => ipcRenderer.invoke('notes:list', date, projectId),
@@ -84,6 +83,7 @@ const api = {
   },
   overlay: {
     setCompact: (compact: boolean): Promise<void> => ipcRenderer.invoke('overlay:setCompact', compact),
+    setHeight: (height: number): Promise<void> => ipcRenderer.invoke('overlay:setHeight', height),
     openMainWindow: (): Promise<void> => ipcRenderer.invoke('overlay:openMainWindow'),
     show: (): Promise<void> => ipcRenderer.invoke('overlay:show'),
     hide: (): Promise<void> => ipcRenderer.invoke('overlay:hide'),

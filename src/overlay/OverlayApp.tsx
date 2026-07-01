@@ -7,7 +7,7 @@ import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
 import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon } from '@/components/icons';
 import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
-import { AddNoteModal } from '@/components/AddNoteModal';
+import { OverlayNoteView } from './OverlayNoteView';
 
 export function OverlayApp() {
   const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, switchProject, start } = useTimer();
@@ -45,6 +45,17 @@ export function OverlayApp() {
     window.api.overlay.setCompact(next);
   };
 
+  // Compact mode is a 44px-tall window, too short for a dropdown — grow it while the switch menu is open, then restore.
+  const COMPACT_MENU_HEIGHT = 320;
+  const openCompactSwitch = () => {
+    setSwitchOpen(true);
+    window.api.overlay.setHeight(COMPACT_MENU_HEIGHT);
+  };
+  const closeCompactSwitch = () => {
+    setSwitchOpen(false);
+    window.api.overlay.setHeight(44);
+  };
+
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
 
@@ -73,33 +84,53 @@ export function OverlayApp() {
     );
   }
 
+  if (noteOpen) {
+    return (
+      <OverlayNoteView
+        onCancel={() => setNoteOpen(false)}
+        onSave={(text) => {
+          window.api.notes.add(todayIso(), project.id, text);
+          setNoteOpen(false);
+        }}
+      />
+    );
+  }
+
   if (compact && !onBreak) {
     return (
-      <div className="drag-region flex h-full w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg">
-        <button
-          className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
-          onClick={() => {
-            toggleCompact(false);
-            setSwitchOpen(true);
-          }}
-        >
-          <ColorDot color={project.color} />
-          <span className="truncate text-sm font-bold text-slate-900">{project.code}</span>
-        </button>
-        <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
-          <ExpandIcon width={14} height={14} />
-        </IconButton>
-        <span className="font-mono text-sm font-semibold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</span>
-        <IconButton
-          label={state.status === 'running' ? 'Pause' : 'Resume'}
-          className="no-drag h-7 w-7 shrink-0"
-          onClick={() => (state.status === 'running' ? pause() : resume())}
-        >
-          {state.status === 'running' ? <PauseIcon width={14} height={14} /> : <PlayIcon width={14} height={14} />}
-        </IconButton>
-        <IconButton label="Close overlay" className="no-drag h-7 w-7 shrink-0" onClick={() => window.api.overlay.hide()}>
-          <CloseIcon width={14} height={14} />
-        </IconButton>
+      <div className="relative h-full w-full">
+        <div className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg">
+          <button
+            className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
+            onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
+          >
+            <ColorDot color={project.color} />
+            <span className="truncate text-sm font-bold text-slate-900">{project.code}</span>
+          </button>
+          <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
+            <ExpandIcon width={14} height={14} />
+          </IconButton>
+          <span className="font-mono text-sm font-semibold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</span>
+          <IconButton
+            label={state.status === 'running' ? 'Pause' : 'Resume'}
+            className="no-drag h-7 w-7 shrink-0"
+            onClick={() => (state.status === 'running' ? pause() : resume())}
+          >
+            {state.status === 'running' ? <PauseIcon width={14} height={14} /> : <PlayIcon width={14} height={14} />}
+          </IconButton>
+          <IconButton label="Close overlay" className="no-drag h-7 w-7 shrink-0" onClick={() => window.api.overlay.hide()}>
+            <CloseIcon width={14} height={14} />
+          </IconButton>
+        </div>
+        {switchOpen && (
+          <QuickSwitchMenu
+            projects={projects}
+            activeProjectId={state.activeProjectId}
+            onSelect={switchProject}
+            onClose={closeCompactSwitch}
+            anchorClassName="top-12 left-0"
+          />
+        )}
       </div>
     );
   }
@@ -192,14 +223,6 @@ export function OverlayApp() {
         </div>
       )}
 
-      {noteOpen && (
-        <AddNoteModal
-          date={todayIso()}
-          projectId={project.id}
-          projectLabel={`${project.code} — ${project.name}`}
-          onClose={() => setNoteOpen(false)}
-        />
-      )}
     </div>
   );
 }

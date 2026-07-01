@@ -26,7 +26,7 @@ export function BarChart({ data, targetMinutes, onBarClick }: BarChartProps) {
         {data.map((d) => {
           const heightPct = Math.max(2, (d.minutes / maxScale) * 100);
           const isUnder = d.status === 'under';
-          const clickable = isUnder && !!onBarClick;
+          const clickable = !!onBarClick;
           return (
             <button
               key={d.date}

@@ -20,8 +20,8 @@ export function Modal({ title, subtitle, onClose, children, footer, width = 'max
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`w-full ${width} rounded-2xl bg-white shadow-2xl`}>
-        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+      <div className={`flex max-h-[90vh] w-full flex-col ${width} rounded-2xl bg-white shadow-2xl`}>
+        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
             {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
@@ -36,8 +36,8 @@ export function Modal({ title, subtitle, onClose, children, footer, width = 'max
             </svg>
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
-        {footer && <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">{footer}</div>}
+        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-3 border-t border-slate-100 px-6 py-4">{footer}</div>}
       </div>
     </div>
   );

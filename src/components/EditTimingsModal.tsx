@@ -62,6 +62,23 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
   const updateRow = (key: string, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
+  // Dragging the snail retargets the day's total; spread the delta across the listed projects (proportionally, or evenly if all zero).
+  const applySeek = (fraction: number) => {
+    const target = Math.round(fraction * targetMinutes);
+    setRows((prev) => {
+      const editable = prev.filter((r) => r.projectId !== '');
+      if (editable.length === 0) return prev;
+      const current = editable.reduce((s, r) => s + r.durationMinutes, 0);
+      const delta = target - current;
+      if (delta === 0) return prev;
+      return prev.map((r) => {
+        if (r.projectId === '') return r;
+        const share = current > 0 ? (r.durationMinutes / current) * delta : delta / editable.length;
+        return { ...r, durationMinutes: Math.max(0, Math.round(r.durationMinutes + share)) };
+      });
+    });
+  };
+
   const save = async () => {
     setSaving(true);
     const existingProjectIds = new Set(rows.filter((r) => !r.isNew).map((r) => r.projectId));
@@ -100,7 +117,7 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
           <span className="font-semibold text-slate-500">{minutesToHhMm(targetMinutes)}</span> target
         </p>
         <div className="mt-2">
-          <ProgressBar fraction={targetMinutes > 0 ? trackedMinutes / targetMinutes : 0} tone={underBy > 0.5 ? 'red' : 'amber'} />
+          <ProgressBar fraction={targetMinutes > 0 ? trackedMinutes / targetMinutes : 0} tone={underBy > 0.5 ? 'red' : 'amber'} onSeek={applySeek} />
         </div>
         {underBy > 0.5 && (
           <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-amber-600">
