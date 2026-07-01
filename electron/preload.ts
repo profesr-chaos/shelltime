@@ -34,6 +34,11 @@ const api = {
     applyDelta: (date: string, projectIds: number[], deltaMinutes: number): Promise<void> =>
       ipcRenderer.invoke('entries:applyDelta', date, projectIds, deltaMinutes),
   },
+  holidays: {
+    list: (month: string): Promise<{ date: string; minutes: number }[]> => ipcRenderer.invoke('holidays:list', month),
+    add: (date: string): Promise<DailyEntry> => ipcRenderer.invoke('holidays:add', date),
+    remove: (date: string): Promise<void> => ipcRenderer.invoke('holidays:remove', date),
+  },
   notes: {
     list: (date: string, projectId?: number): Promise<Note[]> => ipcRenderer.invoke('notes:list', date, projectId),
     listForMonth: (month: string): Promise<(Note & { project: Project })[]> => ipcRenderer.invoke('notes:listForMonth', month),

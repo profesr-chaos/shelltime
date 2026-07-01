@@ -191,6 +191,18 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle('holidays:list', (_e, month) => db.listHolidays(month));
+  ipcMain.handle('holidays:add', (_e, date) => {
+    const entry = db.addHoliday(date);
+    broadcast('projects:changed'); // the HOLIDAY project may have just been created
+    if (date === todayStr()) broadcast('timer:update', timer.getState());
+    return entry;
+  });
+  ipcMain.handle('holidays:remove', (_e, date) => {
+    db.removeHoliday(date);
+    if (date === todayStr()) broadcast('timer:update', timer.getState());
+  });
+
   ipcMain.handle('notes:list', (_e, date, projectId) => db.listNotes(date, projectId));
   ipcMain.handle('notes:add', (_e, date, projectId, text) => db.addNote(date, projectId, text));
   ipcMain.handle('notes:update', (_e, id, text) => db.updateNote(id, text));

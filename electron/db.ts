@@ -288,6 +288,42 @@ export function deleteProject(id: number): void {
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
 }
 
+// ---------- holidays ----------
+// A holiday is a day booked at its full daily target under a dedicated inactive "HOLIDAY" project,
+// so annual leave counts toward the monthly target instead of dragging it down.
+const HOLIDAY_CODE = 'HOLIDAY';
+
+function getProjectByCode(code: string): Project | null {
+  const row = db.prepare('SELECT * FROM projects WHERE code = ?').get(code);
+  return row ? rowToProject(row) : null;
+}
+
+function ensureHolidayProject(): Project {
+  const existing = getProjectByCode(HOLIDAY_CODE);
+  if (existing) return existing;
+  const created = createProject({ code: HOLIDAY_CODE, name: 'Holiday', color: '#0EA5E9' });
+  return setProjectActive(created.id, false); // keep it out of timing lists
+}
+
+export function addHoliday(date: string): DailyEntry {
+  const project = ensureHolidayProject();
+  return setDailyEntry(date, project.id, getDailyTargetMinutes(date), 'manual');
+}
+
+export function removeHoliday(date: string): void {
+  const project = getProjectByCode(HOLIDAY_CODE);
+  if (project) deleteDailyEntry(date, project.id);
+}
+
+export function listHolidays(month: string): { date: string; minutes: number }[] {
+  const project = getProjectByCode(HOLIDAY_CODE);
+  if (!project) return [];
+  const rows = db
+    .prepare('SELECT date, duration_minutes FROM daily_project_time WHERE project_id = ? AND date LIKE ? ORDER BY date ASC')
+    .all(project.id, `${month}%`) as any[];
+  return rows.map((r) => ({ date: r.date, minutes: r.duration_minutes }));
+}
+
 // ---------- daily project time ----------
 
 function rowToEntry(row: any): DailyEntry {

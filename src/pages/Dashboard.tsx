@@ -9,6 +9,7 @@ import { ChevronLeftIcon, ChevronRightIcon, TrendUpIcon } from '@/components/ico
 import { DonutChart } from '@/components/charts/DonutChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { EditTimingsModal } from '@/components/EditTimingsModal';
+import { HolidayCard } from '@/components/HolidayCard';
 
 interface DashboardProps {
   onOpenExport?: (month: string) => void;
@@ -108,6 +109,10 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
           )}
           <p className="mt-3 text-xs text-slate-400">Click any day to edit its timings.</p>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <HolidayCard month={month} onChanged={load} />
       </div>
 
       <div className="mt-6 grid grid-cols-5 gap-4">
