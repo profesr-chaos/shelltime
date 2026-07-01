@@ -111,7 +111,7 @@ export function initDb(userDataDir: string) {
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [
@@ -119,6 +119,29 @@ function runMigrations() {
     () => {},
     // migrations[1]: v1 -> v2 — drop the retired monthlyTargetMode setting
     () => db.prepare("DELETE FROM settings WHERE key = 'monthlyTargetMode'").run(),
+    // migrations[2]: v2 -> v3 — remove old-model HOLIDAY/SICK day entries that no leave_record backs,
+    // so orphaned holidays stop inflating tracked time / the progress snail.
+    () => {
+      const projs = db.prepare("SELECT id, code FROM projects WHERE code IN ('HOLIDAY','SICK')").all() as { id: number; code: string }[];
+      if (!projs.length) return;
+      const records = db.prepare('SELECT type, start_date, end_date FROM leave_records').all() as any[];
+      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const covered: Record<string, Set<string>> = { HOLIDAY: new Set(), SICK: new Set() };
+      for (const r of records) {
+        const code = r.type === 'sick' ? 'SICK' : 'HOLIDAY';
+        const cur = new Date(r.start_date + 'T00:00:00');
+        const end = new Date(r.end_date + 'T00:00:00');
+        while (cur <= end) {
+          covered[code].add(iso(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+      const del = db.prepare('DELETE FROM daily_project_time WHERE project_id = ? AND date = ?');
+      for (const p of projs) {
+        const rows = db.prepare('SELECT date FROM daily_project_time WHERE project_id = ?').all(p.id) as { date: string }[];
+        for (const row of rows) if (!covered[p.code].has(row.date)) del.run(p.id, row.date);
+      }
+    },
   ];
   for (let v = current; v < SCHEMA_VERSION; v++) migrations[v]?.();
   if (current < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
