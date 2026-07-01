@@ -13,7 +13,7 @@ export default defineConfig({
           resolve: { alias: { '@shared': path.resolve(__dirname, 'shared') } },
           build: {
             outDir: 'dist-electron',
-            rollupOptions: { external: ['better-sqlite3', 'date-holidays'] },
+            rollupOptions: { external: ['better-sqlite3', 'date-holidays', 'exceljs'] },
           },
         },
       },

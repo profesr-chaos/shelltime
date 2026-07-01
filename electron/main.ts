@@ -332,6 +332,20 @@ function registerIpc() {
     return { ok: true, filePath };
   });
 
+  handle('export:xlsx', async (_e, month: string) => {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
+      title: 'Export timesheet (Excel)',
+      defaultPath: `Shelltime-${month}.xlsx`,
+      filters: [{ name: 'Excel workbook', extensions: ['xlsx'] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
+    const { buildTimesheetWorkbook } = await import('./timesheetXlsx');
+    const buffer = await buildTimesheetWorkbook(db.getMonthlySummary(month));
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(filePath, buffer);
+    return { ok: true, filePath };
+  });
+
   handle('export:print', async (_e, month) => {
     const printWin = new BrowserWindow({ show: false, webPreferences: { preload: path.join(__dirname, 'preload.js') } });
     loadWindow(printWin, 'index.html', `?print=${month}`);
