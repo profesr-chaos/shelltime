@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, powerMonitor } 
 import path from 'node:path';
 import * as db from './db';
 import { TimerEngine } from './timer';
+import { listCountries, listStates } from './holidays';
 
 // Wrap every IPC handler so a thrown error is logged in the main process (and still rejects the
 // renderer promise) instead of failing silently and, e.g., leaving a screen blank.
@@ -220,6 +221,9 @@ function registerIpc() {
       broadcast('timer:update', timer.getState());
     }
   });
+
+  handle('holidays:countries', () => listCountries());
+  handle('holidays:states', (_e, country: string) => listStates(country));
 
   handle('leave:summary', (_e, month: string) => db.getLeaveSummary(month));
   handle('leave:list', () => db.listLeave());

@@ -7,33 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { currentMonthStr } from '@/lib/format';
 import { useToast } from '@/components/ui/Toast';
 
-// Common regions; date-holidays supports many more (see hd.getCountries()).
-const HOLIDAY_REGIONS = [
-  { value: 'GB-ENG', label: 'United Kingdom — England & Wales' },
-  { value: 'GB-SCT', label: 'United Kingdom — Scotland' },
-  { value: 'GB-NIR', label: 'United Kingdom — Northern Ireland' },
-  { value: 'IE', label: 'Ireland' },
-  { value: 'US', label: 'United States' },
-  { value: 'CA', label: 'Canada' },
-  { value: 'AU', label: 'Australia' },
-  { value: 'NZ', label: 'New Zealand' },
-  { value: 'SE', label: 'Sweden' },
-  { value: 'NO', label: 'Norway' },
-  { value: 'DK', label: 'Denmark' },
-  { value: 'FI', label: 'Finland' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'FR', label: 'France' },
-  { value: 'ES', label: 'Spain' },
-  { value: 'IT', label: 'Italy' },
-  { value: 'NL', label: 'Netherlands' },
-  { value: 'BE', label: 'Belgium' },
-  { value: 'CH', label: 'Switzerland' },
-  { value: 'AT', label: 'Austria' },
-  { value: 'PL', label: 'Poland' },
-  { value: 'PT', label: 'Portugal' },
-  { value: 'IN', label: 'India' },
-];
-
 const DAYS = [
   { day: 1, label: 'Mon' },
   { day: 2, label: 'Tue' },
@@ -49,6 +22,8 @@ export function Settings() {
   const [dataPath, setDataPath] = useState('');
   const [monthlyOverrideEnabled, setMonthlyOverrideEnabled] = useState(false);
   const [monthlyOverrideHours, setMonthlyOverrideHours] = useState('40');
+  const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
+  const [states, setStates] = useState<{ code: string; name: string }[]>([]);
   const toast = useToast();
   const month = currentMonthStr();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +33,16 @@ export function Settings() {
     window.api.app.getDataPath().then(setDataPath);
     window.api.targets.getMonthly(month).then((minutes) => setMonthlyOverrideHours((minutes / 60).toFixed(1)));
   }, [month]);
+
+  useEffect(() => {
+    window.api.holidays.countries().then(setCountries);
+  }, []);
+
+  // Load the sub-regions (states/provinces) for the selected country.
+  const holidayCountry = settings?.holidayRegion.split('-')[0] ?? '';
+  useEffect(() => {
+    if (holidayCountry) window.api.holidays.states(holidayCountry).then(setStates);
+  }, [holidayCountry]);
 
   if (!settings) return null;
 
@@ -115,11 +100,29 @@ export function Settings() {
           </p>
           {settings.skipBankHolidays && (
             <FieldWrap label="Holiday region">
-              <Select value={settings.holidayRegion} onChange={(e) => update({ holidayRegion: e.target.value })} className="max-w-xs">
-                {HOLIDAY_REGIONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  value={holidayCountry}
+                  onChange={(e) => update({ holidayRegion: e.target.value })}
+                  className="max-w-xs"
+                >
+                  {countries.map((c) => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </Select>
+                {states.length > 0 && (
+                  <Select
+                    value={settings.holidayRegion.includes('-') ? settings.holidayRegion.slice(holidayCountry.length + 1) : ''}
+                    onChange={(e) => update({ holidayRegion: e.target.value ? `${holidayCountry}-${e.target.value}` : holidayCountry })}
+                    className="max-w-xs"
+                  >
+                    <option value="">Whole country</option>
+                    {states.map((s) => (
+                      <option key={s.code} value={s.code}>{s.name}</option>
+                    ))}
+                  </Select>
+                )}
+              </div>
             </FieldWrap>
           )}
         </div>

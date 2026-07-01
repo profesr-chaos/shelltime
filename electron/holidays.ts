@@ -15,3 +15,16 @@ export function isPublicHoliday(dateStr: string, region: string): boolean {
   const result = getHolidays(region).isHoliday(new Date(dateStr + 'T12:00:00'));
   return Array.isArray(result) && result.some((h) => h.type === 'public' || h.type === 'bank');
 }
+
+const toSortedList = (obj: Record<string, string> | undefined) =>
+  Object.entries(obj ?? {})
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+export function listCountries(): { code: string; name: string }[] {
+  return toSortedList(new Holidays().getCountries('en') as Record<string, string>);
+}
+
+export function listStates(country: string): { code: string; name: string }[] {
+  return toSortedList(new Holidays(country).getStates(country, 'en') as Record<string, string> | undefined);
+}

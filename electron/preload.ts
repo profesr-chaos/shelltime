@@ -37,6 +37,10 @@ const api = {
     applyDelta: (date: string, projectIds: number[], deltaMinutes: number): Promise<void> =>
       ipcRenderer.invoke('entries:applyDelta', date, projectIds, deltaMinutes),
   },
+  holidays: {
+    countries: (): Promise<{ code: string; name: string }[]> => ipcRenderer.invoke('holidays:countries'),
+    states: (country: string): Promise<{ code: string; name: string }[]> => ipcRenderer.invoke('holidays:states', country),
+  },
   leave: {
     summary: (month: string): Promise<LeaveSummary> => ipcRenderer.invoke('leave:summary', month),
     list: (): Promise<LeaveRecord[]> => ipcRenderer.invoke('leave:list'),
