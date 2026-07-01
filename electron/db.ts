@@ -10,6 +10,7 @@ import type {
   MonthlySummary,
   MonthlyDailyTotal,
 } from '../shared/types';
+import { OVERLAY_OPACITY_FLOOR } from '../shared/types';
 
 let db: Database.Database;
 
@@ -23,9 +24,14 @@ const DEFAULT_SETTINGS: Settings = {
   overlayAlwaysOnTop: true,
   overlayCompact: false,
   overlayPosition: null,
+  overlayOpacity: 1,
   startWithWindows: false,
   workingDays: [1, 2, 3, 4, 5],
 };
+
+export function clampOverlayOpacity(value: number): number {
+  return Math.max(OVERLAY_OPACITY_FLOOR, Math.min(1, value));
+}
 
 export function initDb(userDataDir: string) {
   fs.mkdirSync(userDataDir, { recursive: true });
@@ -177,6 +183,9 @@ export function getSettings(): Settings {
 }
 
 export function updateSettings(patch: Partial<Settings>): Settings {
+  if (patch.overlayOpacity !== undefined) {
+    patch = { ...patch, overlayOpacity: clampOverlayOpacity(patch.overlayOpacity) };
+  }
   const upsert = db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );

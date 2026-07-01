@@ -5,7 +5,7 @@ import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { secondsToHms, minutesToHhMm, todayIso } from '@/lib/format';
 import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
-import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon, ChevronRightIcon } from '@/components/icons';
+import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon } from '@/components/icons';
 import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
 import { AddNoteModal } from '@/components/AddNoteModal';
 
@@ -48,14 +48,6 @@ export function OverlayApp() {
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
 
-  const cycleToNextProject = () => {
-    const active = [...projects].filter((p) => p.isActive).sort((a, b) => a.code.localeCompare(b.code));
-    if (active.length < 2) return;
-    const idx = active.findIndex((p) => p.id === state.activeProjectId);
-    const next = active[(idx + 1) % active.length];
-    switchProject(next.id);
-  };
-
   if (!project) {
     return (
       <div className="drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 shadow-lg">
@@ -84,12 +76,18 @@ export function OverlayApp() {
   if (compact && !onBreak) {
     return (
       <div className="drag-region flex h-full w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg">
-        <button className="no-drag flex flex-1 items-center gap-2 overflow-hidden" onClick={() => toggleCompact(false)}>
+        <button
+          className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
+          onClick={() => {
+            toggleCompact(false);
+            setSwitchOpen(true);
+          }}
+        >
           <ColorDot color={project.color} />
           <span className="truncate text-sm font-bold text-slate-900">{project.code}</span>
         </button>
-        <IconButton label="Next project" className="no-drag h-6 w-6 shrink-0" onClick={cycleToNextProject}>
-          <ChevronRightIcon width={14} height={14} />
+        <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
+          <ExpandIcon width={14} height={14} />
         </IconButton>
         <span className="font-mono text-sm font-semibold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</span>
         <IconButton

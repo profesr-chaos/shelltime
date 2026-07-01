@@ -64,6 +64,7 @@ function createOverlayWindow() {
     frame: false,
     transparent: true,
     resizable: false,
+    opacity: settings.overlayOpacity,
     alwaysOnTop: settings.overlayAlwaysOnTop,
     skipTaskbar: true,
     hasShadow: false,
@@ -203,6 +204,7 @@ function registerIpc() {
         resizeOverlayWindow(patch.overlayCompact ? 340 : 320, patch.overlayCompact ? 60 : 220);
         broadcast('overlay:compactChanged', patch.overlayCompact);
       }
+      if ('overlayOpacity' in patch) overlayWindow.setOpacity(updated.overlayOpacity);
     }
     return updated;
   });
@@ -278,6 +280,7 @@ function registerIpc() {
     overlayWindow.show();
     const settings = db.getSettings();
     resizeOverlayWindow(settings.overlayCompact ? 340 : 320, settings.overlayCompact ? 60 : 220);
+    overlayWindow.setOpacity(settings.overlayOpacity);
   });
   ipcMain.handle('overlay:hide', () => overlayWindow?.hide());
 

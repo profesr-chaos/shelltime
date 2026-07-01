@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
+import { OVERLAY_OPACITY_FLOOR } from '@shared/types';
 import { Toggle, TextInput, FieldWrap } from '@/components/ui/Inputs';
 import { DurationInput } from '@/components/ui/DurationInput';
 import { Button } from '@/components/ui/Button';
@@ -132,6 +133,20 @@ export function Settings() {
       <Section title="Overlay">
         <Toggle checked={settings.overlayAlwaysOnTop} onChange={(v) => update({ overlayAlwaysOnTop: v })} label="Always on top" />
         <Toggle checked={settings.overlayCompact} onChange={(v) => update({ overlayCompact: v })} label="Compact mode" />
+        <FieldWrap label="Overlay opacity" hint={`Can't go below ${Math.round(OVERLAY_OPACITY_FLOOR * 100)}% so it never disappears entirely`}>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={Math.round(OVERLAY_OPACITY_FLOOR * 100)}
+              max={100}
+              step={5}
+              value={Math.round(settings.overlayOpacity * 100)}
+              onChange={(e) => update({ overlayOpacity: Number(e.target.value) / 100 })}
+              className="h-2 flex-1 accent-amber-500"
+            />
+            <span className="w-12 text-right text-sm font-medium text-slate-700">{Math.round(settings.overlayOpacity * 100)}%</span>
+          </div>
+        </FieldWrap>
       </Section>
 
       <Section title="Startup">

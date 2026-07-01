@@ -39,9 +39,12 @@ export interface Settings {
   overlayAlwaysOnTop: boolean;
   overlayCompact: boolean;
   overlayPosition: { x: number; y: number } | null;
+  overlayOpacity: number;
   startWithWindows: boolean;
   workingDays: number[];
 }
+
+export const OVERLAY_OPACITY_FLOOR = 0.3;
 
 export type TimerStatus = 'idle' | 'running' | 'paused';
 
