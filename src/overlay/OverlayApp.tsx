@@ -33,7 +33,13 @@ export function OverlayApp() {
     };
   }, []);
 
-  const theme = dark ? 'dark' : '';
+  // Tailwind's class-based dark variant needs `.dark` on an ancestor, so put it on <html>
+  // rather than on each root div (where `.dark .dark:*` can't match the element itself).
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+  }, [dark]);
+
+  const theme = '';
 
   useEffect(() => {
     if (minutesWorked !== null && compact) {
@@ -72,33 +78,10 @@ export function OverlayApp() {
 
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
+  // No active project yet: selecting one should start timing rather than switch.
+  const selectProject = project ? switchProject : start;
 
-  if (!project) {
-    return (
-      <div className={`${theme} drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
-        <IconButton label="Close overlay" className="no-drag absolute right-1.5 top-1.5 h-6 w-6" onClick={() => window.api.overlay.hide()}>
-          <CloseIcon width={12} height={12} />
-        </IconButton>
-        <div className="no-drag relative">
-          <button onClick={() => setSwitchOpen((v) => !v)} className="text-sm font-medium text-amber hover:underline">
-            Choose a project to start
-          </button>
-          {switchOpen && (
-            <QuickSwitchMenu
-              projects={projects}
-              activeProjectId={null}
-              onSelect={start}
-              onClose={() => setSwitchOpen(false)}
-              anchorClassName="top-8 left-0"
-              heading="Start timing"
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (noteOpen) {
+  if (noteOpen && project) {
     return (
       <div className={`${theme} h-full w-full`}>
         <OverlayNoteView
@@ -120,8 +103,8 @@ export function OverlayApp() {
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
             onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
           >
-            <ColorDot color={project.color} />
-            <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{project.code}</span>
+            {project ? <ColorDot color={project.color} /> : null}
+            <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{project?.code ?? 'Choose project'}</span>
           </button>
           <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
             <ExpandIcon width={14} height={14} />
@@ -129,6 +112,7 @@ export function OverlayApp() {
           <span className="font-mono text-sm font-semibold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</span>
           <IconButton
             label={state.status === 'running' ? 'Pause' : 'Resume'}
+            disabled={!project}
             className="no-drag h-7 w-7 shrink-0"
             onClick={() => (state.status === 'running' ? pause() : resume())}
           >
@@ -142,7 +126,7 @@ export function OverlayApp() {
           <QuickSwitchMenu
             projects={projects}
             activeProjectId={state.activeProjectId}
-            onSelect={switchProject}
+            onSelect={selectProject}
             onClose={closeCompactSwitch}
             anchorClassName="top-12 left-0"
           />
@@ -173,16 +157,25 @@ export function OverlayApp() {
 
       <div className={`px-4 pb-3 transition-opacity ${onBreak ? 'opacity-40 grayscale' : ''}`}>
         <div className="flex items-center justify-between">
-          <span className="rounded-md bg-amber px-2 py-0.5 text-xs font-bold text-white">{project.code}</span>
+          {project ? (
+            <span className="rounded-md bg-amber px-2 py-0.5 text-xs font-bold text-white">{project.code}</span>
+          ) : (
+            <button
+              onClick={() => setSwitchOpen((v) => !v)}
+              className="no-drag rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-500 hover:border-amber hover:text-amber dark:border-slate-600 dark:text-slate-300"
+            >
+              Choose project
+            </button>
+          )}
           <span className="text-xs text-slate-400">{minutesToHhMm(liveTodayTotalSeconds / 60)} tracked</span>
         </div>
         <div className="my-3 text-center font-mono text-3xl font-bold tabular-nums text-slate-900 dark:text-white">
           {secondsToHms(liveActiveSeconds)}
         </div>
         <button
-          disabled={onBreak}
+          disabled={onBreak || !project}
           onClick={() => (state.status === 'running' ? pause() : resume())}
-          className="no-drag flex w-full items-center justify-center gap-2 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-default"
+          className="no-drag flex w-full items-center justify-center gap-2 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-default disabled:opacity-50"
         >
           {state.status === 'running' ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
           {state.status === 'running' ? 'Pause' : 'Resume'}
@@ -196,13 +189,13 @@ export function OverlayApp() {
               <QuickSwitchMenu
                 projects={projects}
                 activeProjectId={state.activeProjectId}
-                onSelect={switchProject}
+                onSelect={selectProject}
                 onClose={() => setSwitchOpen(false)}
                 anchorClassName="bottom-10 left-0"
               />
             )}
           </div>
-          <IconButton label="Add note" disabled={onBreak} className="no-drag flex-1" onClick={() => setNoteOpen(true)}>
+          <IconButton label="Add note" disabled={onBreak || !project} className="no-drag flex-1" onClick={() => setNoteOpen(true)}>
             <NoteIcon width={16} height={16} />
           </IconButton>
         </div>
