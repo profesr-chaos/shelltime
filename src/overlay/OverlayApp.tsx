@@ -5,7 +5,7 @@ import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { secondsToHms, minutesToHhMm, todayIso } from '@/lib/format';
 import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
-import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon } from '@/components/icons';
+import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon, SunIcon, MoonIcon } from '@/components/icons';
 import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
 import { OverlayNoteView } from './OverlayNoteView';
 
@@ -55,6 +55,9 @@ export function OverlayApp() {
     setCompact(next);
     window.api.overlay.setCompact(next);
   };
+
+  // Persist the theme; the settings:changed broadcast updates `dark` (here and in the main window).
+  const toggleDark = () => window.api.settings.update({ overlayDark: !dark });
 
   // Compact mode is a 44px-tall window, too short for a dropdown — grow it while the switch menu is open, then restore.
   const COMPACT_MENU_HEIGHT = 320;
@@ -153,6 +156,9 @@ export function OverlayApp() {
       <div className="drag-region relative flex h-8 shrink-0 items-center justify-center">
         <span className="h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-600" />
         <div className="no-drag absolute right-2 top-1 flex gap-1">
+          <IconButton label={dark ? 'Light mode' : 'Dark mode'} className="h-6 w-6" onClick={toggleDark}>
+            {dark ? <SunIcon width={12} height={12} /> : <MoonIcon width={12} height={12} />}
+          </IconButton>
           <IconButton label="Open full app" className="h-6 w-6" onClick={() => window.api.overlay.openMainWindow()}>
             <ExpandIcon width={12} height={12} />
           </IconButton>
