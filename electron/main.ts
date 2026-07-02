@@ -164,21 +164,21 @@ function pauseTimerForIdle() {
   broadcast('timer:update', timer.getState());
 }
 
-// Sleep/lock means you're definitely away — silently pause. Plain input-idle is ambiguous (could be a
-// meeting), so pause but prompt the user to keep or discard the idle time instead of losing it silently.
+// Sleep/lock means you're definitely away — silently pause. Plain input-idle is ambiguous (a 2-hour
+// meeting looks the same as walking away), so we DON'T pause: the timer keeps running while we prompt,
+// so the full idle window is known and the user keeps it (a meeting) or discards all of it (away).
 let idlePromptOpen = false;
+let idlePromptStartedAt: number | null = null; // epoch ms the idle window began
 
-function pauseTimerForIdlePrompt() {
+function promptIdle() {
   if (timer.getState().status !== 'running') return;
   const projectId = timer.getState().activeProjectId;
+  if (projectId === null) return;
   const idleSeconds = Math.round(powerMonitor.getSystemIdleTime());
-  timer.pause();
-  broadcast('timer:update', timer.getState());
-  if (projectId !== null) {
-    idlePromptOpen = true;
-    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
-    broadcast('idle:prompt', { projectId, idleSeconds });
-  }
+  idlePromptOpen = true;
+  idlePromptStartedAt = Date.now() - idleSeconds * 1000;
+  if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
+  broadcast('idle:prompt', { projectId, idleSeconds });
 }
 
 function startIdleMonitor() {
@@ -188,7 +188,7 @@ function startIdleMonitor() {
     if (idlePromptOpen) return;
     const idleMinutes = db.getSettings().autoPauseIdleMinutes;
     if (idleMinutes <= 0) return;
-    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) pauseTimerForIdlePrompt();
+    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) promptIdle();
   }, 30_000);
 }
 
@@ -347,11 +347,18 @@ function registerIpc() {
     if (typeof remindInMinutes === 'number') timer.snoozeBreakFor(remindInMinutes);
     else timer.resetBreakClock();
   });
-  handle('timer:resolveIdle', (_e, discard: boolean, projectId: number, idleSeconds: number, resume: boolean) => {
+  handle('timer:resolveIdle', (_e, discard: boolean, projectId: number, idleSeconds: number) => {
     if (!idlePromptOpen) return; // already resolved from the other window
     idlePromptOpen = false;
-    if (discard) timer.discardSeconds(projectId, idleSeconds);
-    if (resume) timer.resume();
+    if (discard) {
+      // Remove the whole idle window (the timer kept running through it), then continue timing.
+      const seconds = idlePromptStartedAt !== null ? (Date.now() - idlePromptStartedAt) / 1000 : idleSeconds;
+      timer.pause();
+      timer.discardSeconds(projectId, seconds);
+      timer.resume();
+    }
+    // On keep, the timer never paused, so there's nothing to do — it's still running.
+    idlePromptStartedAt = null;
     broadcast('timer:update', timer.getState());
     broadcast('idle:resolved');
   });

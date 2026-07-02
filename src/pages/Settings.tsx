@@ -202,7 +202,7 @@ export function Settings() {
           onChange={(v) => update({ grindMode: v })}
           label={settings.grindMode ? 'Grind mode is ON - break reminders are suppressed' : 'Grind mode'}
         />
-        <FieldWrap label="Auto-pause when idle" tooltip="Pauses a running timer after this much inactivity, or on sleep/lock. Set to 0 to disable.">
+        <FieldWrap label="Ask about idle time after" tooltip="After this much inactivity, the timer keeps running but asks whether to keep the time (a meeting) or discard it (you walked away). Sleep/lock still pauses immediately. Set to 0 to disable.">
           <DurationInput
             minutes={settings.autoPauseIdleMinutes}
             onChange={(minutes) => update({ autoPauseIdleMinutes: Math.max(0, minutes) })}

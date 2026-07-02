@@ -5,13 +5,13 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 
 export function IdlePromptModal() {
-  const { idle, keep, discard } = useIdlePrompt();
+  const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
   const { projects } = useProjects();
 
   if (!idle) return null;
 
   const project = projects.find((p) => p.id === idle.projectId);
-  const minutes = Math.max(1, Math.round(idle.idleSeconds / 60));
+  const minutes = Math.max(1, Math.round(liveIdleSeconds / 60));
 
   return (
     <Modal
@@ -25,10 +25,10 @@ export function IdlePromptModal() {
         </>
       }
     >
-      <p className="text-center font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(idle.idleSeconds)}</p>
+      <p className="text-center font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
       <p className="mt-3 text-sm text-slate-600">
-        No mouse or keyboard activity, so the timer paused. If you were in a meeting, keep the time. If you stepped
-        away, discard it - then timing continues.
+        No mouse or keyboard activity - the timer is still running. If you were in a meeting, keep the time. If you
+        stepped away, discard it - then timing continues.
       </p>
     </Modal>
   );

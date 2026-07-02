@@ -16,7 +16,7 @@ export function OverlayApp() {
   const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, switchProject, start } = useTimer();
   const { projects } = useProjects();
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
-  const { idle, keep, discard } = useIdlePrompt();
+  const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
   const resumePrompt = useResumePrompt();
   const drag = useOverlayDrag();
 
@@ -134,14 +134,14 @@ export function OverlayApp() {
 
   if (idle) {
     const idleProject = projects.find((p) => p.id === idle.projectId);
-    const idleMinutes = Math.max(1, Math.round(idle.idleSeconds / 60));
+    const idleMinutes = Math.max(1, Math.round(liveIdleSeconds / 60));
     return (
       <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
         <p className="text-sm font-bold text-slate-900 dark:text-white">Still working?</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
           Idle{idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?
         </p>
-        <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(idle.idleSeconds)}</p>
+        <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
         <div className="mt-3 flex gap-2">
           <button
             onClick={keep}
