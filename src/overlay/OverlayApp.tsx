@@ -3,6 +3,7 @@ import { useTimer } from '@/hooks/useTimer';
 import { useProjects } from '@/hooks/useProjects';
 import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { useIdlePrompt } from '@/hooks/useIdlePrompt';
+import { useResumePrompt } from '@/hooks/useResumePrompt';
 import { useOverlayDrag } from '@/hooks/useOverlayDrag';
 import { secondsToHms, minutesToHhMm, todayIso } from '@/lib/format';
 import { IconButton } from '@/components/ui/Button';
@@ -15,7 +16,8 @@ export function OverlayApp() {
   const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, switchProject, start } = useTimer();
   const { projects } = useProjects();
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
-  const { idle, keep, discard } = useIdlePrompt();
+  const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
+  const resumePrompt = useResumePrompt();
   const drag = useOverlayDrag();
 
   const [compact, setCompact] = useState(true);
@@ -95,11 +97,40 @@ export function OverlayApp() {
 
   // Size the overlay to whatever it's currently showing: idle prompt, the break panel (which needs
   // extra room below the normal widget), or the plain compact/expanded widget.
+  const onResume = resumePrompt.projectId !== null;
+
   useEffect(() => {
-    if (idle) window.api.overlay.setHeight(210);
+    if (idle || onResume) window.api.overlay.setHeight(210);
     else if (onBreak) window.api.overlay.setHeight(390);
     else window.api.overlay.setHeight(compact ? 44 : 220);
-  }, [idle, onBreak, compact]);
+  }, [idle, onResume, onBreak, compact]);
+
+  if (onResume) {
+    const resumeProject = projects.find((p) => p.id === resumePrompt.projectId);
+    return (
+      <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+        <p className="text-sm font-bold text-slate-900 dark:text-white">Back to work?</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+          Detected activity{resumeProject ? ` on ${resumeProject.code}` : ''} - timing again for
+        </p>
+        <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(resumePrompt.liveSeconds)}</p>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={resumePrompt.keep}
+            className="no-drag flex-1 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
+          >
+            Keep going
+          </button>
+          <button
+            onClick={resumePrompt.reject}
+            className="no-drag flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Not yet
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (idle) {
     const idleProject = projects.find((p) => p.id === idle.projectId);
@@ -108,8 +139,9 @@ export function OverlayApp() {
       <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
         <p className="text-sm font-bold text-slate-900 dark:text-white">Still working?</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-          Idle for ~{idleMinutes} min{idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?
+          Idle{idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?
         </p>
+        <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
         <div className="mt-3 flex gap-2">
           <button
             onClick={keep}

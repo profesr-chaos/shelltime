@@ -3,6 +3,7 @@ import type { Settings as SettingsType } from '@shared/types';
 import { Sidebar } from './components/Sidebar';
 import { BottomTimerBar } from './components/BottomTimerBar';
 import { IdlePromptModal } from './components/IdlePromptModal';
+import { ResumePromptModal } from './components/ResumePromptModal';
 import { ToastProvider } from './components/ui/Toast';
 import { useProjects } from './hooks/useProjects';
 import { Today } from './pages/Today';
@@ -42,6 +43,7 @@ export default function App() {
         <BottomTimerBar />
       </div>
       <IdlePromptModal />
+      <ResumePromptModal />
 
       {exportMonth && <ExportPreview month={exportMonth} onClose={() => setExportMonth(null)} />}
       {needsSetup && !welcomeDismissed && (

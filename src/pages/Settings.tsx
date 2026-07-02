@@ -210,6 +210,16 @@ export function Settings() {
             maxMinutes={2 * 60}
           />
         </FieldWrap>
+        <FieldWrap label="When you start working again" tooltip="What happens once a paused timer detects mouse or keyboard activity again.">
+          <Select
+            value={settings.idleResumeMode}
+            onChange={(e) => update({ idleResumeMode: e.target.value as SettingsType['idleResumeMode'] })}
+          >
+            <option value="auto">Resume automatically</option>
+            <option value="prompt">Ask to keep or discard the time</option>
+            <option value="off">Do nothing (stay paused)</option>
+          </Select>
+        </FieldWrap>
       </Section>
 
       <Section title="Overlay">

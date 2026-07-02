@@ -111,6 +111,21 @@ const api = {
     },
     resolveIdle: (discard: boolean, projectId: number, idleSeconds: number, resume: boolean): Promise<void> =>
       ipcRenderer.invoke('timer:resolveIdle', discard, projectId, idleSeconds, resume),
+    onResumePrompt: (cb: (data: { projectId: number }) => void) => {
+      const listener = (_: unknown, data: { projectId: number }) => cb(data);
+      ipcRenderer.on('resume:prompt', listener);
+      return () => {
+        ipcRenderer.removeListener('resume:prompt', listener);
+      };
+    },
+    onResumeResolved: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('resume:resolved', listener);
+      return () => {
+        ipcRenderer.removeListener('resume:resolved', listener);
+      };
+    },
+    resolveResume: (discard: boolean): Promise<void> => ipcRenderer.invoke('timer:resolveResume', discard),
   },
   dashboard: {
     getMonthlySummary: (month: string): Promise<MonthlySummary> => ipcRenderer.invoke('dashboard:getMonthlySummary', month),

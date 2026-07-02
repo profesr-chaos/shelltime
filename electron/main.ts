@@ -192,6 +192,42 @@ function startIdleMonitor() {
   }, 30_000);
 }
 
+// While paused, watch for the user coming back. We only "arm" once they've actually gone idle
+// (so a manual pause while sitting at the desk doesn't instantly resume), then fire when fresh
+// input arrives. 'auto' resumes silently; 'prompt' resumes but asks to keep-or-discard the time.
+const RESUME_ARM_IDLE_SECONDS = 15; // must have been idle at least this long to arm
+const RESUME_ACTIVE_SECONDS = 3; // input newer than this counts as "back to work"
+let resumeArmed = false;
+let resumePromptOpen = false;
+let resumePromptStartedAt: number | null = null;
+
+function startResumeMonitor() {
+  setInterval(() => {
+    if (resumePromptOpen || idlePromptOpen) return;
+    const state = timer.getState();
+    if (state.status !== 'paused' || state.activeProjectId === null) {
+      resumeArmed = false;
+      return;
+    }
+    const mode = db.getSettings().idleResumeMode;
+    if (mode === 'off') return;
+    const idle = powerMonitor.getSystemIdleTime();
+    if (idle >= RESUME_ARM_IDLE_SECONDS) {
+      resumeArmed = true;
+    } else if (resumeArmed && idle < RESUME_ACTIVE_SECONDS) {
+      resumeArmed = false;
+      timer.resume();
+      broadcast('timer:update', timer.getState());
+      if (mode === 'prompt') {
+        resumePromptOpen = true;
+        resumePromptStartedAt = Date.now();
+        if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
+        broadcast('resume:prompt', { projectId: state.activeProjectId });
+      }
+    }
+  }, 2000);
+}
+
 function registerIpc() {
   handle('projects:list', (_e, includeInactive: boolean) => db.listProjects(includeInactive));
   handle('projects:create', (_e, input) => {
@@ -319,6 +355,19 @@ function registerIpc() {
     broadcast('timer:update', timer.getState());
     broadcast('idle:resolved');
   });
+  handle('timer:resolveResume', (_e, discard: boolean) => {
+    if (!resumePromptOpen) return; // already resolved from the other window
+    resumePromptOpen = false;
+    if (discard && resumePromptStartedAt !== null) {
+      const projectId = timer.getState().activeProjectId;
+      const seconds = (Date.now() - resumePromptStartedAt) / 1000;
+      timer.pause();
+      if (projectId !== null) timer.discardSeconds(projectId, seconds);
+    }
+    resumePromptStartedAt = null;
+    broadcast('timer:update', timer.getState());
+    broadcast('resume:resolved');
+  });
 
   handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
   handle('notes:listForMonth', (_e, month) => db.listNotesForMonth(month));
@@ -444,6 +493,7 @@ app.whenReady().then(() => {
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
   startIdleMonitor();
+  startResumeMonitor();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

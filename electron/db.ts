@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: Settings = {
   defaultDailyTargetMinutes: 480,
   breakIntervalMinutes: 60,
   autoPauseIdleMinutes: 10,
+  idleResumeMode: 'auto',
   grindMode: false,
   overlayAlwaysOnTop: true,
   overlayCompact: false,
