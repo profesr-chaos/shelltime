@@ -152,6 +152,12 @@ function broadcast(channel: string, ...args: unknown[]) {
   }
 }
 
+// Filename-safe export prefix from settings, falling back to the app name.
+function exportPrefix(): string {
+  const raw = db.getSettings().exportPrefix?.trim() || 'Shelltime';
+  return raw.replace(/[\\/:*?"<>|]/g, '').trim() || 'Shelltime';
+}
+
 function pauseTimerForIdle() {
   if (timer.getState().status !== 'running') return;
   timer.pause();
@@ -321,7 +327,7 @@ function registerIpc() {
   handle('export:pdf', async (_e, month) => {
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
       title: 'Export monthly report',
-      defaultPath: `Shelltime-${month}.pdf`,
+      defaultPath: `${exportPrefix()}_${month}.pdf`,
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
@@ -354,12 +360,12 @@ function registerIpc() {
   handle('export:xlsx', async (_e, month: string) => {
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {
       title: 'Export timesheet (Excel)',
-      defaultPath: `Shelltime-${month}.xlsx`,
+      defaultPath: `${exportPrefix()}_${month}.xlsx`,
       filters: [{ name: 'Excel workbook', extensions: ['xlsx'] }],
     });
     if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
     const { buildTimesheetWorkbook } = await import('./timesheetXlsx');
-    const buffer = await buildTimesheetWorkbook(db.getMonthlySummary(month));
+    const buffer = await buildTimesheetWorkbook(db.getMonthlySummary(month), db.getSettings().userName?.trim() || 'Shelltime');
     const fs = await import('node:fs/promises');
     await fs.writeFile(filePath, buffer);
     return { ok: true, filePath };

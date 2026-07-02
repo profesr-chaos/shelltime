@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
 import { OVERLAY_OPACITY_FLOOR } from '@shared/types';
 import { Toggle, TextInput, Select, FieldWrap } from '@/components/ui/Inputs';
@@ -27,6 +27,22 @@ export function Settings() {
   const toast = useToast();
   const month = currentMonthStr();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<Partial<SettingsType>>({});
+
+  // Persist any accumulated (debounced) setting changes now.
+  const flushSettings = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const patch = pendingRef.current;
+    if (Object.keys(patch).length === 0) return;
+    pendingRef.current = {};
+    window.api.settings.update(patch).then(() => toast('Settings saved'));
+  }, [toast]);
+
+  // Don't lose pending changes when leaving the Settings page.
+  useEffect(() => () => flushSettings(), [flushSettings]);
 
   useEffect(() => {
     window.api.settings.get().then(setSettings);
@@ -46,22 +62,20 @@ export function Settings() {
 
   if (!settings) return null;
 
+  // All settings saves are debounced by 5s: update local state immediately, merge the patch, and
+  // persist once activity stops (or on unmount via flushSettings).
   const update = (patch: Partial<SettingsType>) => {
     setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
-    window.api.settings.update(patch).then(() => toast('Settings saved'));
+    pendingRef.current = { ...pendingRef.current, ...patch };
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(flushSettings, 5000);
   };
 
   // Changing an essential setting also marks setup complete, clearing the "!" prompts.
   const updateEssential = (patch: Partial<SettingsType>) => update({ ...patch, hasCompletedSetup: true });
   const needsSetup = !settings.hasCompletedSetup;
 
-  const updateDebounced = (patch: Partial<SettingsType>) => {
-    setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      window.api.settings.update(patch).then(() => toast('Settings saved'));
-    }, 500);
-  };
+  const updateDebounced = update;
 
   return (
     <div className="max-w-2xl">
@@ -220,6 +234,23 @@ export function Settings() {
 
       <Section title="Startup">
         <Toggle checked={settings.startWithWindows} onChange={(v) => update({ startWithWindows: v })} label="Start Shelltime with Windows" />
+      </Section>
+
+      <Section title="Export">
+        <FieldWrap label="Your name" tooltip="Shown in report headings, e.g. &quot;Jane Doe - Monthly Report&quot;.">
+          <TextInput
+            value={settings.userName}
+            placeholder="Shelltime"
+            onChange={(e) => updateDebounced({ userName: e.target.value })}
+          />
+        </FieldWrap>
+        <FieldWrap label="Export filename prefix" tooltip="Exports are named &lt;prefix&gt;_&lt;month&gt;, e.g. jane_2026-07.xlsx.">
+          <TextInput
+            value={settings.exportPrefix}
+            placeholder="Shelltime"
+            onChange={(e) => updateDebounced({ exportPrefix: e.target.value })}
+          />
+        </FieldWrap>
       </Section>
 
       <Section title="Data">

@@ -102,7 +102,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm">
               <TrendUpIcon className="text-emerald-600" width={16} height={16} />
               <span>
-                <span className="font-semibold">Overtime alert:</span> You worked {minutesToHoursLabel(Math.abs(overtimeDeltaMinutes))}{' '}
+                <span className="font-semibold"></span> You worked {minutesToHoursLabel(Math.abs(overtimeDeltaMinutes))}{' '}
                 {overtimeDeltaMinutes > 0 ? 'more' : 'less'} than last month.
               </span>
             </div>

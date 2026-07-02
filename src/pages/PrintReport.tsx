@@ -8,11 +8,13 @@ const hoursCell = (minutes: number): string => (minutes > 0 ? (minutes / 60).toF
 export function PrintReport({ month }: { month: string }) {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [notes, setNotes] = useState<NoteWithProject[]>([]);
+  const [userName, setUserName] = useState('Shelltime');
   const [exportedAt] = useState(() => new Date());
 
   useEffect(() => {
     window.api.dashboard.getMonthlySummary(month).then(setSummary);
     window.api.notes.listForMonth(month).then(setNotes);
+    window.api.settings.get().then((s) => setUserName(s.userName?.trim() || 'Shelltime'));
   }, [month]);
 
   if (!summary) {
@@ -44,7 +46,7 @@ export function PrintReport({ month }: { month: string }) {
 
       <header className="mb-6 flex items-end justify-between border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-xl font-bold">Shelltime - Monthly Report</h1>
+          <h1 className="text-xl font-bold">{userName} - Monthly Report</h1>
           <p className="mt-0.5 text-base text-slate-600">{formatMonth(month)}</p>
         </div>
         <p className="text-[10px] text-slate-400">Exported {exportedAt.toLocaleString()}</p>
@@ -104,13 +106,18 @@ export function PrintReport({ month }: { month: string }) {
 
       <p className="mt-2 text-[9px] text-slate-400">Hours worked per project per day. Weekend columns are shaded.</p>
 
-      <section className="mt-6 grid grid-cols-3 gap-4">
+      <section className="mt-6 grid grid-cols-4 gap-4">
         <Kpi label="Total hours worked" value={minutesToHoursLabel(summary.actualMinutes)} />
         <Kpi label="Target hours" value={minutesToHoursLabel(summary.targetMinutes)} />
         <Kpi
-          label="Overtime"
+          label="Overtime (month)"
           value={signedHoursLabel(summary.thisMonthOvertimeMinutes)}
           valueClass={isOvertime ? 'text-emerald-600' : 'text-red-500'}
+        />
+        <Kpi
+          label="Overtime (cumulative)"
+          value={signedHoursLabel(summary.cumulativeOvertimeMinutes)}
+          valueClass={summary.cumulativeOvertimeMinutes >= 0 ? 'text-emerald-600' : 'text-red-500'}
         />
       </section>
 

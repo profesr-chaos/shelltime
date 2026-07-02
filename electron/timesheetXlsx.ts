@@ -7,7 +7,7 @@ const formatMonth = (month: string) => {
 };
 
 // Builds the timesheet as a project-x-day grid workbook, mirroring the PDF report.
-export async function buildTimesheetWorkbook(summary: MonthlySummary): Promise<Buffer> {
+export async function buildTimesheetWorkbook(summary: MonthlySummary, userName = 'Shelltime'): Promise<Buffer> {
   const { month } = summary;
   const [y, m] = month.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -17,14 +17,18 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary): Promise<B
     const wd = new Date(y, m - 1, d).getDay();
     return wd === 0 || wd === 6;
   };
-  const hours = (minutes: number) => (minutes > 0 ? Math.round((minutes / 60) * 100) / 100 : null);
+  // Blank rather than 0.00 whenever the value rounds to zero hours (covers tiny sub-rounding minutes too).
+  const hours = (minutes: number) => {
+    const h = Math.round((minutes / 60) * 100) / 100;
+    return h > 0 ? h : null;
+  };
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Shelltime';
   const ws = wb.addWorksheet('Timesheet', { views: [{ state: 'frozen', xSplit: 1, ySplit: 3 }] });
 
   ws.mergeCells(1, 1, 1, days.length + 2);
-  ws.getCell(1, 1).value = `Shelltime Timesheet — ${formatMonth(month)}`;
+  ws.getCell(1, 1).value = `${userName} - Timesheet - ${formatMonth(month)}`;
   ws.getCell(1, 1).font = { bold: true, size: 14 };
 
   // Header row (row 3): Project | 1..N | Total
@@ -41,7 +45,7 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary): Promise<B
     const r = ws.addRow([
       row.project.code,
       ...days.map((d) => hours(row.minutesByDate[dateStr(d)] ?? 0)),
-      Math.round((row.totalMinutes / 60) * 100) / 100,
+      hours(row.totalMinutes),
     ]);
     r.getCell(1).value = `${row.project.code} — ${row.project.name}`;
     r.getCell(days.length + 2).font = { bold: true };
@@ -80,7 +84,9 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary): Promise<B
   const kpis: [string, number][] = [
     ['Total hours worked', summary.actualMinutes / 60],
     ['Target hours', summary.targetMinutes / 60],
-    ['Overtime', summary.thisMonthOvertimeMinutes / 60],
+    ['Overtime (this month)', summary.thisMonthOvertimeMinutes / 60],
+    ['Overtime carried over', summary.carriedOverOvertimeMinutes / 60],
+    ['Overtime (cumulative)', summary.cumulativeOvertimeMinutes / 60],
   ];
   for (const [label, value] of kpis) {
     const r = ws.addRow([label, Math.round(value * 100) / 100]);

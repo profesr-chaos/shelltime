@@ -68,6 +68,8 @@ export interface Settings {
   skipBankHolidays: boolean;
   holidayRegion: string; // "GB-ENG", "IE", "US" … country code, optionally "-STATE"
   hasCompletedSetup: boolean; // false until the user has reviewed the essential settings
+  exportPrefix: string; // filename prefix for exports: <exportPrefix>_<date>
+  userName: string; // shown in report headings: "<userName> - Monthly Report"
 }
 
 export const OVERLAY_OPACITY_FLOOR = 0.3;
@@ -128,6 +130,8 @@ export interface MonthlySummary {
   thisMonthOvertimeMinutes: number;
   lastMonthOvertimeMinutes: number;
   lastMonthActualMinutes: number;
+  carriedOverOvertimeMinutes: number; // running overtime from all prior tracked months
+  cumulativeOvertimeMinutes: number; // carried-over + this month
   byProject: MonthlyProjectHours[];
   grid: MonthlyProjectGridRow[];
   dailyTotals: MonthlyDailyTotal[];

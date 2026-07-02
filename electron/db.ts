@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS: Settings = {
   skipBankHolidays: true,
   holidayRegion: 'GB-ENG',
   hasCompletedSetup: false,
+  exportPrefix: 'Shelltime',
+  userName: 'Shelltime',
 };
 
 export function clampOverlayOpacity(value: number): number {
@@ -659,6 +661,15 @@ export function getMonthlySummary(month: string): MonthlySummary {
   const thisMonthOvertimeMinutes = actualMinutes - targetMinutes;
   const lastMonthOvertimeMinutes = lastMonthActualMinutes - prevTarget;
 
+  // Overtime carries forward: sum (worked - target) over every prior month that has tracked time,
+  // so being under target this month is offset by banked overtime from earlier months.
+  const priorMonths = db
+    .prepare(`SELECT substr(date,1,7) as m, COALESCE(SUM(duration_minutes),0) as total
+              FROM daily_project_time WHERE substr(date,1,7) < ? GROUP BY m`)
+    .all(month) as { m: string; total: number }[];
+  const carriedOverOvertimeMinutes = priorMonths.reduce((s, r) => s + (r.total - getMonthlyTargetMinutes(r.m)), 0);
+  const cumulativeOvertimeMinutes = carriedOverOvertimeMinutes + thisMonthOvertimeMinutes;
+
   // V1 has no session history, so switches are approximated as timer-sourced project/day rows.
   const projectSwitches = entries.filter((e) => e.source === 'timer').length;
 
@@ -674,6 +685,8 @@ export function getMonthlySummary(month: string): MonthlySummary {
     thisMonthOvertimeMinutes,
     lastMonthOvertimeMinutes,
     lastMonthActualMinutes,
+    carriedOverOvertimeMinutes,
+    cumulativeOvertimeMinutes,
     byProject,
     grid,
     dailyTotals,
