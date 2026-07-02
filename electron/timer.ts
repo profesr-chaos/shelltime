@@ -97,6 +97,15 @@ export class TimerEngine {
     this.continuousWorkSeconds = 0;
   }
 
+  /** Remove idle seconds that were banked to a project (e.g. the user was away, not in a meeting). */
+  discardSeconds(projectId: number, seconds: number) {
+    db.addTimeToProject(this.currentDate, projectId, -seconds / 60, 'timer');
+    if (this.activeProjectId === projectId) {
+      this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
+      this.emit();
+    }
+  }
+
   private todayTotalSeconds(): number {
     return db.getDailyTotalMinutes(this.currentDate) * 60 + this.liveElapsedSeconds();
   }

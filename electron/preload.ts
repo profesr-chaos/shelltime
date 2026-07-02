@@ -95,6 +95,22 @@ const api = {
       };
     },
     snoozeBreak: (): Promise<void> => ipcRenderer.invoke('timer:snoozeBreak'),
+    onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number }) => void) => {
+      const listener = (_: unknown, data: { projectId: number; idleSeconds: number }) => cb(data);
+      ipcRenderer.on('idle:prompt', listener);
+      return () => {
+        ipcRenderer.removeListener('idle:prompt', listener);
+      };
+    },
+    onIdleResolved: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('idle:resolved', listener);
+      return () => {
+        ipcRenderer.removeListener('idle:resolved', listener);
+      };
+    },
+    resolveIdle: (discard: boolean, projectId: number, idleSeconds: number, resume: boolean): Promise<void> =>
+      ipcRenderer.invoke('timer:resolveIdle', discard, projectId, idleSeconds, resume),
   },
   dashboard: {
     getMonthlySummary: (month: string): Promise<MonthlySummary> => ipcRenderer.invoke('dashboard:getMonthlySummary', month),

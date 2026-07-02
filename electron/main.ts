@@ -158,14 +158,31 @@ function pauseTimerForIdle() {
   broadcast('timer:update', timer.getState());
 }
 
-// Auto-pause a running timer when the machine goes idle/asleep/locked, so you don't bank time while away.
+// Sleep/lock means you're definitely away — silently pause. Plain input-idle is ambiguous (could be a
+// meeting), so pause but prompt the user to keep or discard the idle time instead of losing it silently.
+let idlePromptOpen = false;
+
+function pauseTimerForIdlePrompt() {
+  if (timer.getState().status !== 'running') return;
+  const projectId = timer.getState().activeProjectId;
+  const idleSeconds = Math.round(powerMonitor.getSystemIdleTime());
+  timer.pause();
+  broadcast('timer:update', timer.getState());
+  if (projectId !== null) {
+    idlePromptOpen = true;
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
+    broadcast('idle:prompt', { projectId, idleSeconds });
+  }
+}
+
 function startIdleMonitor() {
   powerMonitor.on('suspend', pauseTimerForIdle);
   powerMonitor.on('lock-screen', pauseTimerForIdle);
   setInterval(() => {
+    if (idlePromptOpen) return;
     const idleMinutes = db.getSettings().autoPauseIdleMinutes;
     if (idleMinutes <= 0) return;
-    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) pauseTimerForIdle();
+    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) pauseTimerForIdlePrompt();
   }, 30_000);
 }
 
@@ -285,6 +302,14 @@ function registerIpc() {
     broadcast('timer:update', timer.getState());
   });
   handle('timer:snoozeBreak', () => timer.resetBreakClock());
+  handle('timer:resolveIdle', (_e, discard: boolean, projectId: number, idleSeconds: number, resume: boolean) => {
+    if (!idlePromptOpen) return; // already resolved from the other window
+    idlePromptOpen = false;
+    if (discard) timer.discardSeconds(projectId, idleSeconds);
+    if (resume) timer.resume();
+    broadcast('timer:update', timer.getState());
+    broadcast('idle:resolved');
+  });
 
   handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
   handle('notes:listForMonth', (_e, month) => db.listNotesForMonth(month));
