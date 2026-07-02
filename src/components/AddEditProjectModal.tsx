@@ -63,7 +63,7 @@ export function AddEditProjectModal({ project, onClose, onSaved }: AddEditProjec
       >
         <p className="text-sm text-slate-600">
           This permanently deletes <span className="font-semibold">{project.code}</span> and all its tracked time and
-          notes. This can&apos;t be undone — if you just want to stop it showing up day-to-day, archive it instead
+          notes. This can&apos;t be undone - if you just want to stop it showing up day-to-day, archive it instead
           (toggle it inactive in the edit form).
         </p>
       </Modal>

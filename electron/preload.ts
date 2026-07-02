@@ -7,6 +7,7 @@ import type {
   EntrySource,
   TimerState,
   MonthlySummary,
+  ProjectHistory,
   LeaveType,
   LeaveRecord,
   LeaveSummary,
@@ -20,6 +21,7 @@ const api = {
     update: (id: number, patch: Partial<Project>): Promise<Project> => ipcRenderer.invoke('projects:update', id, patch),
     setActive: (id: number, isActive: boolean): Promise<Project> => ipcRenderer.invoke('projects:setActive', id, isActive),
     delete: (id: number): Promise<void> => ipcRenderer.invoke('projects:delete', id),
+    history: (id: number): Promise<ProjectHistory> => ipcRenderer.invoke('projects:history', id),
     onChanged: (cb: () => void) => {
       const listener = () => cb();
       ipcRenderer.on('projects:changed', listener);

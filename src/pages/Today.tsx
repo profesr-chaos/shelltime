@@ -152,7 +152,7 @@ export function Today() {
           </IconButton>
         </div>
         <div className="flex flex-col gap-3">
-          {rows.length === 0 && <p className="text-sm text-slate-400">No active projects yet — add one from the Projects page.</p>}
+          {rows.length === 0 && <p className="text-sm text-slate-400">No active projects yet - add one from the Projects page.</p>}
           {rows.map(({ project, isActive, minutes }) => {
             const noteCount = notesByProject.get(project.id) ?? 0;
             const entry = entries.find((e) => e.projectId === project.id);
@@ -173,7 +173,9 @@ export function Today() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setNotesFor({ date, project })}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm hover:bg-slate-100 ${
+                      noteCount > 0 ? 'font-bold text-amber' : 'text-slate-400 hover:text-slate-600'
+                    }`}
                     title="View / add notes"
                   >
                     💬 {noteCount > 0 ? noteCount : ''}

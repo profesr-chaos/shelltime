@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import type { Project } from '@shared/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { Project, ProjectHistory } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
-import { currentMonthStr, minutesToHoursLabel } from '@/lib/format';
+import { currentMonthStr, minutesToHoursLabel, formatDateShort, formatMonth } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
-import { Badge, ColorDot } from '@/components/ui/Badge';
-import { TextInput } from '@/components/ui/Inputs';
+import { ColorDot } from '@/components/ui/Badge';
+import { TextInput, Select } from '@/components/ui/Inputs';
 import { PlusIcon, SearchIcon, ChevronRightIcon } from '@/components/icons';
 import { AddEditProjectModal } from '@/components/AddEditProjectModal';
 
@@ -12,12 +12,18 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   const { projects, refresh } = useProjects(true);
   const [search, setSearch] = useState('');
   const [hoursByProject, setHoursByProject] = useState<Map<number, number>>(new Map());
+  const [commentsByProject, setCommentsByProject] = useState<Map<number, number>>(new Map());
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
   useEffect(() => {
     window.api.dashboard.getMonthlySummary(currentMonthStr()).then((summary) => {
       setHoursByProject(new Map(summary.byProject.map((bp) => [bp.project.id, bp.minutes])));
+    });
+    window.api.notes.listForMonth(currentMonthStr()).then((notes) => {
+      const map = new Map<number, number>();
+      for (const n of notes) map.set(n.projectId, (map.get(n.projectId) ?? 0) + 1);
+      setCommentsByProject(map);
     });
   }, [projects]);
 
@@ -46,15 +52,17 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
       </div>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="grid grid-cols-[1fr_140px_140px] border-b border-slate-100 bg-slate-50 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          <span>Code / Name</span>
-          <span>Status</span>
+        <div className="grid grid-cols-[32px_140px_1fr_140px_140px] border-b border-slate-100 bg-slate-50 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span />
+          <span>Project Code</span>
+          <span>Name</span>
+          <span className="text-right">Comments MTD</span>
           <span className="text-right">Hours MTD</span>
         </div>
         {active.map((p) => (
-          <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} onClick={() => setEditing(p)} />
+          <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} />
         ))}
-        {active.length === 0 && <p className="px-6 py-6 text-sm text-slate-400">No projects yet — add one to get started.</p>}
+        {active.length === 0 && <p className="px-6 py-6 text-sm text-slate-400">No projects yet - add one to get started.</p>}
 
         {inactive.length > 0 && (
           <div className="border-t border-slate-100">
@@ -66,7 +74,7 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
               Inactive Projects ({inactive.length})
             </button>
             {showInactive && inactive.map((p) => (
-              <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} onClick={() => setEditing(p)} />
+              <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} />
             ))}
           </div>
         )}
@@ -83,22 +91,79 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   );
 }
 
-function ProjectRow({ project, hours, onClick }: { project: Project; hours: number; onClick: () => void }) {
+function ProjectRow({ project, hours, comments, onEdit }: { project: Project; hours: number; comments: number; onEdit: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState<ProjectHistory | null>(null);
+  const [month, setMonth] = useState('all');
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !history) window.api.projects.history(project.id).then(setHistory);
+  };
+
+  const months = useMemo(
+    () => (history ? [...new Set(history.notes.map((n) => n.date.slice(0, 7)))].sort().reverse() : []),
+    [history]
+  );
+
+  const notes = useMemo(() => {
+    if (!history) return [];
+    const list = month === 'all' ? history.notes : history.notes.filter((n) => n.date.slice(0, 7) === month);
+    return [...list].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  }, [history, month]);
+
   return (
-    <button
-      onClick={onClick}
-      className="grid w-full grid-cols-[1fr_140px_140px] items-center border-b border-slate-50 px-6 py-4 text-left last:border-0 hover:bg-slate-50"
-    >
-      <div>
-        <p className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+    <div className="border-b border-slate-50 last:border-0">
+      <div className="grid grid-cols-[32px_140px_1fr_140px_140px] items-center px-6 py-4 hover:bg-slate-50">
+        <button
+          onClick={toggle}
+          aria-label={open ? 'Hide comments' : 'Show comments'}
+          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+        >
+          <ChevronRightIcon className={`transition-transform ${open ? 'rotate-90' : ''}`} width={16} height={16} />
+        </button>
+        <button onClick={onEdit} className="flex items-center gap-2 text-left text-xs font-semibold text-slate-400">
           <ColorDot color={project.color} /> {project.code}
-        </p>
-        <p className="mt-0.5 font-semibold text-slate-900">{project.name}</p>
+        </button>
+        <button onClick={onEdit} className="text-left font-semibold text-slate-900">{project.name}</button>
+        <span className="text-right font-medium text-slate-700">{comments}</span>
+        <span className="text-right font-medium text-slate-700">{minutesToHoursLabel(hours)}</span>
       </div>
-      <span>
-        <Badge tone={project.isActive ? 'green' : 'slate'}>{project.isActive ? 'ACTIVE' : 'INACTIVE'}</Badge>
-      </span>
-      <span className="text-right font-medium text-slate-700">{minutesToHoursLabel(hours)}</span>
-    </button>
+
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">Comments</h3>
+            <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-48">
+              <option value="all">All dates</option>
+              {months.map((m) => (
+                <option key={m} value={m}>{formatMonth(m)}</option>
+              ))}
+            </Select>
+          </div>
+          {!history && <p className="text-sm text-slate-400">Loading…</p>}
+          {history && notes.length === 0 && <p className="text-sm text-slate-400">No comments for this period.</p>}
+          {notes.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th className="w-40 pb-2 font-semibold">Date</th>
+                  <th className="pb-2 font-semibold">Comment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notes.map((n) => (
+                  <tr key={n.id} className="border-t border-slate-200 align-top">
+                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">{formatDateShort(n.date)}</td>
+                    <td className="py-2 whitespace-pre-wrap text-slate-700">{n.text}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

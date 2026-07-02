@@ -469,11 +469,15 @@ export function deleteDailyEntry(date: string, projectId: number): void {
 
 // ---------- notes ----------
 
+function mapNoteRow(row: any): Note {
+  return { id: row.id, date: row.date, projectId: row.project_id, text: row.text, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
 export function listNotes(date: string, projectId?: number): Note[] {
   const rows = projectId
     ? db.prepare('SELECT * FROM notes WHERE date = ? AND project_id = ? ORDER BY created_at ASC').all(date, projectId)
     : db.prepare('SELECT * FROM notes WHERE date = ? ORDER BY created_at ASC').all(date);
-  return rows as Note[];
+  return (rows as any[]).map(mapNoteRow);
 }
 
 export function addNote(date: string, projectId: number, text: string): Note {
@@ -481,16 +485,24 @@ export function addNote(date: string, projectId: number, text: string): Note {
   const result = db
     .prepare('INSERT INTO notes (date, project_id, text, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
     .run(date, projectId, text, ts, ts);
-  return db.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid) as Note;
+  return mapNoteRow(db.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid));
 }
 
 export function updateNote(id: number, text: string): Note {
   db.prepare('UPDATE notes SET text = ?, updated_at = ? WHERE id = ?').run(text, now(), id);
-  return db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as Note;
+  return mapNoteRow(db.prepare('SELECT * FROM notes WHERE id = ?').get(id));
 }
 
 export function deleteNote(id: number): void {
   db.prepare('DELETE FROM notes WHERE id = ?').run(id);
+}
+
+export function getProjectHistory(projectId: number): { entries: { date: string; minutes: number }[]; notes: Note[] } {
+  const entries = db
+    .prepare('SELECT date, duration_minutes as minutes FROM daily_project_time WHERE project_id = ? AND duration_minutes > 0 ORDER BY date DESC')
+    .all(projectId) as { date: string; minutes: number }[];
+  const notes = (db.prepare('SELECT * FROM notes WHERE project_id = ? ORDER BY date DESC, created_at ASC').all(projectId) as any[]).map(mapNoteRow);
+  return { entries, notes };
 }
 
 export function listNotesForMonth(month: string): (Note & { project: Project })[] {

@@ -159,14 +159,16 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
                   <option value="">Select project…</option>
                   {available.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code}
+                      {p.code} - {p.name}
                     </option>
                   ))}
                 </Select>
               ) : (
                 <div className="flex flex-1 items-center gap-2">
                   <ColorDot color={project?.color ?? '#94a3b8'} />
-                  <span className="text-sm font-medium text-slate-800">{project?.code ?? 'Unknown'}</span>
+                  <span className="text-sm font-medium text-slate-800">
+                    {project ? `${project.code} - ${project.name}` : 'Unknown'}
+                  </span>
                 </div>
               )}
               <DurationInput

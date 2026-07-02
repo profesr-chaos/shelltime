@@ -85,7 +85,7 @@ export function BottomTimerBar() {
       </div>
 
       {noteOpen && project && (
-        <AddNoteModal date={todayIso()} projectId={project.id} projectLabel={`${project.code} — ${project.name}`} onClose={() => setNoteOpen(false)} />
+        <AddNoteModal date={todayIso()} projectId={project.id} projectLabel={`${project.code} - ${project.name}`} onClose={() => setNoteOpen(false)} />
       )}
     </div>
   );

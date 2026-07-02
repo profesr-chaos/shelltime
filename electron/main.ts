@@ -288,6 +288,7 @@ function registerIpc() {
 
   handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
   handle('notes:listForMonth', (_e, month) => db.listNotesForMonth(month));
+  handle('projects:history', (_e, projectId) => db.getProjectHistory(projectId));
 
   handle('export:pdf', async (_e, month) => {
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow!, {

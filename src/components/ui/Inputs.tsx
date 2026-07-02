@@ -15,7 +15,7 @@ export function FieldWrap({ label, hint, tooltip, alert, children }: FieldWrapPr
         <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
           {label}
           {alert && (
-            <span title="Essential — please set this" className="flex h-4 w-4 items-center justify-center rounded-full bg-amber text-[10px] font-bold text-white">!</span>
+            <span title="Essential - please set this" className="flex h-4 w-4 items-center justify-center rounded-full bg-amber text-[10px] font-bold text-white">!</span>
           )}
           {tooltip && (
             <span title={tooltip} className="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-slate-300 text-[10px] font-semibold text-slate-400">?</span>

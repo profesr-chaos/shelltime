@@ -31,6 +31,11 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface ProjectHistory {
+  entries: { date: string; minutes: number }[];
+  notes: Note[];
+}
+
 export type LeaveType = 'holiday' | 'sick';
 
 export interface LeaveRecord {

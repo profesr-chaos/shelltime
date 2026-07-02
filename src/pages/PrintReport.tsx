@@ -44,7 +44,7 @@ export function PrintReport({ month }: { month: string }) {
 
       <header className="mb-6 flex items-end justify-between border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-xl font-bold">Shelltime — Monthly Report</h1>
+          <h1 className="text-xl font-bold">Shelltime - Monthly Report</h1>
           <p className="mt-0.5 text-base text-slate-600">{formatMonth(month)}</p>
         </div>
         <p className="text-[10px] text-slate-400">Exported {exportedAt.toLocaleString()}</p>

@@ -76,6 +76,14 @@ export function OverlayApp() {
     window.api.overlay.setHeight(44);
   };
 
+  // QuickSwitchMenu closes on clicks inside the overlay; also close (and shrink) when the
+  // overlay loses focus, i.e. the user clicks another window entirely.
+  useEffect(() => {
+    if (!switchOpen || !compact) return;
+    window.addEventListener('blur', closeCompactSwitch);
+    return () => window.removeEventListener('blur', closeCompactSwitch);
+  }, [switchOpen, compact]);
+
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
   // No active project yet: selecting one should start timing rather than switch.
