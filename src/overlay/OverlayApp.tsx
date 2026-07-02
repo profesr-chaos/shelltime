@@ -15,14 +15,25 @@ export function OverlayApp() {
   const { minutesWorked, snooze, takeBreak } = useBreakPrompt();
 
   const [compact, setCompact] = useState(true);
+  const [overlayColor, setOverlayColor] = useState('#ffffff');
   const [switchOpen, setSwitchOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const wasCompactBeforeBreak = useRef(false);
 
   useEffect(() => {
-    window.api.settings.get().then((s) => setCompact(s.overlayCompact));
-    return window.api.overlay.onCompactChanged(setCompact);
+    window.api.settings.get().then((s) => {
+      setCompact(s.overlayCompact);
+      setOverlayColor(s.overlayColor);
+    });
+    const offCompact = window.api.overlay.onCompactChanged(setCompact);
+    const offSettings = window.api.settings.onChanged((s) => setOverlayColor(s.overlayColor));
+    return () => {
+      offCompact();
+      offSettings();
+    };
   }, []);
+
+  const bg = { backgroundColor: overlayColor };
 
   useEffect(() => {
     if (minutesWorked !== null && compact) {
@@ -61,7 +72,7 @@ export function OverlayApp() {
 
   if (!project) {
     return (
-      <div className="drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 shadow-lg">
+      <div style={bg} className="drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 px-4 shadow-lg">
         <IconButton label="Close overlay" className="no-drag absolute right-1.5 top-1.5 h-6 w-6" onClick={() => window.api.overlay.hide()}>
           <CloseIcon width={12} height={12} />
         </IconButton>
@@ -99,7 +110,7 @@ export function OverlayApp() {
   if (compact && !onBreak) {
     return (
       <div className="relative h-full w-full">
-        <div className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg">
+        <div style={bg} className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 px-3 shadow-lg">
           <button
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
             onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
@@ -136,7 +147,7 @@ export function OverlayApp() {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-lg">
+    <div style={bg} className="relative flex h-full w-full flex-col rounded-2xl border border-slate-200 shadow-lg">
       <div className="drag-region relative flex h-8 shrink-0 items-center justify-center">
         <span className="h-1 w-10 rounded-full bg-slate-200" />
         <div className="no-drag absolute right-2 top-1 flex gap-1">
