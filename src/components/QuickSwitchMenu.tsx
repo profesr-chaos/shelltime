@@ -27,7 +27,7 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
   return (
     <div
       ref={ref}
-      className={`absolute z-40 w-72 rounded-xl border border-slate-200 bg-white py-2 shadow-xl ${anchorClassName}`}
+      className={`absolute z-40 w-72 rounded-xl border border-slate-200 bg-white py-2 shadow-xl dark:border-slate-700 dark:bg-slate-800 ${anchorClassName}`}
     >
       <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{heading}</p>
       <div className="max-h-64 overflow-y-auto">
@@ -39,10 +39,10 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
               onClose();
             }}
             disabled={p.id === activeProjectId}
-            className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:cursor-default disabled:opacity-40`}
+            className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:hover:bg-slate-700`}
           >
             <ColorDot color={p.color} className="shrink-0" />
-            <span className="shrink-0 whitespace-nowrap font-medium text-slate-800">{p.code}</span>
+            <span className="shrink-0 whitespace-nowrap font-medium text-slate-800 dark:text-slate-100">{p.code}</span>
             <span className="min-w-0 flex-1 truncate text-slate-400">{p.name}</span>
           </button>
         ))}

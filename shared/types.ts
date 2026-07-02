@@ -57,7 +57,7 @@ export interface Settings {
   overlayCompact: boolean;
   overlayPosition: { x: number; y: number } | null;
   overlayOpacity: number;
-  overlayColor: string; // background colour of the pop-out widget (hex)
+  overlayDark: boolean; // dark theme for the pop-out widget
   startWithWindows: boolean;
   workingDays: number[];
   skipBankHolidays: boolean;

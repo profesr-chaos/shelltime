@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   overlayCompact: false,
   overlayPosition: null,
   overlayOpacity: 1,
-  overlayColor: '#ffffff',
+  overlayDark: false,
   startWithWindows: false,
   workingDays: [1, 2, 3, 4, 5],
   skipBankHolidays: true,

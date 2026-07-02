@@ -37,7 +37,7 @@ export function IconButton({ label, variant = 'default', className = '', childre
       aria-label={label}
       title={label}
       className={`inline-flex items-center justify-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber ${
-        variant === 'primary' ? 'bg-amber text-white hover:bg-orange-600' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+        variant === 'primary' ? 'bg-amber text-white hover:bg-orange-600' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-600'
       } ${className}`}
       {...rest}
     >

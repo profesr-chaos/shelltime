@@ -215,17 +215,7 @@ export function Settings() {
             <span className="w-12 text-right text-sm font-medium text-slate-700">{Math.round(settings.overlayOpacity * 100)}%</span>
           </div>
         </FieldWrap>
-        <FieldWrap label="Overlay colour" tooltip="Background colour of the pop-out widget.">
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              value={settings.overlayColor}
-              onChange={(e) => updateDebounced({ overlayColor: e.target.value })}
-              className="h-9 w-14 cursor-pointer rounded border border-slate-200 bg-white"
-            />
-            <span className="font-mono text-sm text-slate-500">{settings.overlayColor}</span>
-          </div>
-        </FieldWrap>
+        <Toggle checked={settings.overlayDark} onChange={(v) => update({ overlayDark: v })} label="Dark mode" />
       </Section>
 
       <Section title="Startup">

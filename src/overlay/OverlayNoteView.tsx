@@ -11,13 +11,13 @@ export function OverlayNoteView({ onSave, onCancel }: OverlayNoteViewProps) {
   const [text, setText] = useState('');
 
   return (
-    <div className="relative flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
+    <div className="relative flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
       <IconButton label="Cancel" className="no-drag absolute right-2 top-2 h-6 w-6" onClick={onCancel}>
         <CloseIcon width={12} height={12} />
       </IconButton>
       <textarea
         autoFocus
-        className="no-drag mt-7 flex-1 resize-none rounded-lg border border-slate-200 p-2 text-sm text-slate-800 focus:border-amber focus:outline-none focus:ring-2 focus:ring-amber/30"
+        className="no-drag mt-7 flex-1 resize-none rounded-lg border border-slate-200 p-2 text-sm text-slate-800 focus:border-amber focus:outline-none focus:ring-2 focus:ring-amber/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         placeholder="What did you work on?"
         value={text}
         onChange={(e) => setText(e.target.value)}

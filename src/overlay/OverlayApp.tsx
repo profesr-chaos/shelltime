@@ -15,7 +15,7 @@ export function OverlayApp() {
   const { minutesWorked, snooze, takeBreak } = useBreakPrompt();
 
   const [compact, setCompact] = useState(true);
-  const [overlayColor, setOverlayColor] = useState('#ffffff');
+  const [dark, setDark] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const wasCompactBeforeBreak = useRef(false);
@@ -23,17 +23,17 @@ export function OverlayApp() {
   useEffect(() => {
     window.api.settings.get().then((s) => {
       setCompact(s.overlayCompact);
-      setOverlayColor(s.overlayColor);
+      setDark(s.overlayDark);
     });
     const offCompact = window.api.overlay.onCompactChanged(setCompact);
-    const offSettings = window.api.settings.onChanged((s) => setOverlayColor(s.overlayColor));
+    const offSettings = window.api.settings.onChanged((s) => setDark(s.overlayDark));
     return () => {
       offCompact();
       offSettings();
     };
   }, []);
 
-  const bg = { backgroundColor: overlayColor };
+  const theme = dark ? 'dark' : '';
 
   useEffect(() => {
     if (minutesWorked !== null && compact) {
@@ -72,7 +72,7 @@ export function OverlayApp() {
 
   if (!project) {
     return (
-      <div style={bg} className="drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 px-4 shadow-lg">
+      <div className={`${theme} drag-region relative flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
         <IconButton label="Close overlay" className="no-drag absolute right-1.5 top-1.5 h-6 w-6" onClick={() => window.api.overlay.hide()}>
           <CloseIcon width={12} height={12} />
         </IconButton>
@@ -97,26 +97,28 @@ export function OverlayApp() {
 
   if (noteOpen) {
     return (
-      <OverlayNoteView
-        onCancel={() => setNoteOpen(false)}
-        onSave={(text) => {
-          window.api.notes.add(todayIso(), project.id, text);
-          setNoteOpen(false);
-        }}
-      />
+      <div className={`${theme} h-full w-full`}>
+        <OverlayNoteView
+          onCancel={() => setNoteOpen(false)}
+          onSave={(text) => {
+            window.api.notes.add(todayIso(), project.id, text);
+            setNoteOpen(false);
+          }}
+        />
+      </div>
     );
   }
 
   if (compact && !onBreak) {
     return (
-      <div className="relative h-full w-full">
-        <div style={bg} className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 px-3 shadow-lg">
+      <div className={`${theme} relative h-full w-full`}>
+        <div className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <button
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
             onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
           >
             <ColorDot color={project.color} />
-            <span className="truncate text-sm font-bold text-slate-900">{project.code}</span>
+            <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{project.code}</span>
           </button>
           <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
             <ExpandIcon width={14} height={14} />
@@ -147,9 +149,9 @@ export function OverlayApp() {
   }
 
   return (
-    <div style={bg} className="relative flex h-full w-full flex-col rounded-2xl border border-slate-200 shadow-lg">
+    <div className={`${theme} relative flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
       <div className="drag-region relative flex h-8 shrink-0 items-center justify-center">
-        <span className="h-1 w-10 rounded-full bg-slate-200" />
+        <span className="h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-600" />
         <div className="no-drag absolute right-2 top-1 flex gap-1">
           <IconButton label="Open full app" className="h-6 w-6" onClick={() => window.api.overlay.openMainWindow()}>
             <ExpandIcon width={12} height={12} />
@@ -168,7 +170,7 @@ export function OverlayApp() {
           <span className="rounded-md bg-amber px-2 py-0.5 text-xs font-bold text-white">{project.code}</span>
           <span className="text-xs text-slate-400">{minutesToHhMm(liveTodayTotalSeconds / 60)} tracked</span>
         </div>
-        <div className="my-3 text-center font-mono text-3xl font-bold tabular-nums text-slate-900">
+        <div className="my-3 text-center font-mono text-3xl font-bold tabular-nums text-slate-900 dark:text-white">
           {secondsToHms(liveActiveSeconds)}
         </div>
         <button
@@ -201,13 +203,13 @@ export function OverlayApp() {
       </div>
 
       {onBreak && (
-        <div className="border-t border-slate-100 px-4 py-3">
+        <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber text-white">
               <CoffeeIcon width={16} height={16} />
             </span>
             <div>
-              <p className="text-sm font-bold text-slate-900">Time for a break</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">Time for a break</p>
               <p className="text-xs text-slate-400">{minutesWorked} min worked</p>
             </div>
           </div>
@@ -226,7 +228,7 @@ export function OverlayApp() {
                 snooze();
                 restoreCompactIfNeeded();
               }}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Later
             </button>
