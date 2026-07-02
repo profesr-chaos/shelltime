@@ -97,6 +97,12 @@ export class TimerEngine {
     this.continuousWorkSeconds = 0;
   }
 
+  /** Dismiss the break prompt but re-prompt after `minutes` of continued work, not the full interval. */
+  snoozeBreakFor(minutes: number) {
+    const threshold = db.getSettings().breakIntervalMinutes * 60;
+    this.continuousWorkSeconds = Math.max(0, threshold - minutes * 60);
+  }
+
   /** Remove idle seconds that were banked to a project (e.g. the user was away, not in a meeting). */
   discardSeconds(projectId: number, seconds: number) {
     db.addTimeToProject(this.currentDate, projectId, -seconds / 60, 'timer');

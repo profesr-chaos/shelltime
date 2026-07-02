@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, powerMonitor } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, powerMonitor, screen } from 'electron';
 import path from 'node:path';
 import * as db from './db';
 import { TimerEngine } from './timer';
@@ -301,7 +301,10 @@ function registerIpc() {
     timer.switchProject(projectId);
     broadcast('timer:update', timer.getState());
   });
-  handle('timer:snoozeBreak', () => timer.resetBreakClock());
+  handle('timer:snoozeBreak', (_e, remindInMinutes?: number) => {
+    if (typeof remindInMinutes === 'number') timer.snoozeBreakFor(remindInMinutes);
+    else timer.resetBreakClock();
+  });
   handle('timer:resolveIdle', (_e, discard: boolean, projectId: number, idleSeconds: number, resume: boolean) => {
     if (!idlePromptOpen) return; // already resolved from the other window
     idlePromptOpen = false;
@@ -381,16 +384,35 @@ function registerIpc() {
     const [w] = overlayWindow.getSize();
     resizeOverlayWindow(w, Math.round(height));
   });
+  // Custom drag: the renderer distinguishes click vs drag, then repositions the frameless window here.
+  handle('overlay:setPosition', (_e, x: number, y: number) => {
+    if (!overlayWindow) return;
+    overlayWindow.setPosition(Math.round(x), Math.round(y));
+    if (overlaySaveTimeout) clearTimeout(overlaySaveTimeout);
+    overlaySaveTimeout = setTimeout(() => db.updateSettings({ overlayPosition: { x: Math.round(x), y: Math.round(y) } }), 400);
+  });
   handle('overlay:openMainWindow', () => {
     mainWindow?.show();
     mainWindow?.focus();
   });
   handle('overlay:show', () => {
     if (!overlayWindow) return;
+    const alreadyVisible = overlayWindow.isVisible();
     overlayWindow.show();
     const settings = db.getSettings();
-    resizeOverlayWindow(settings.overlayCompact ? 340 : 320, settings.overlayCompact ? 44 : 220);
+    const w = settings.overlayCompact ? 340 : 320;
+    const h = settings.overlayCompact ? 44 : 220;
+    resizeOverlayWindow(w, h);
     overlayWindow.setOpacity(settings.overlayOpacity);
+    // Clicking "Pop out" when it's already showing means "I lost it" — recenter on the cursor's screen.
+    if (alreadyVisible) {
+      const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+      const x = Math.round(workArea.x + (workArea.width - w) / 2);
+      const y = Math.round(workArea.y + (workArea.height - h) / 2);
+      overlayWindow.setPosition(x, y);
+      overlayWindow.focus();
+      db.updateSettings({ overlayPosition: { x, y } });
+    }
   });
   handle('overlay:hide', () => overlayWindow?.hide());
 

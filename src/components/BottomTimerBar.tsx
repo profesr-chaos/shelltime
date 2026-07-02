@@ -48,7 +48,7 @@ export function BottomTimerBar() {
     <div className="fixed inset-y-auto bottom-0 left-60 right-0 z-30 flex items-center justify-between border-t border-slate-200 bg-white px-8 py-4 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Active Project</p>
-        <p className="text-sm font-bold text-slate-900">{project?.code ?? '—'}</p>
+        <p className="text-sm font-bold text-slate-900">{project?.code ?? '-'}</p>
       </div>
 
       <div className="font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</div>

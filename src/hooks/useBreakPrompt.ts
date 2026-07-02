@@ -12,11 +12,16 @@ export function useBreakPrompt() {
     setMinutesWorked(null);
   }, []);
 
+  const snoozeFor = useCallback((minutes: number) => {
+    window.api.timer.snoozeBreak(minutes);
+    setMinutesWorked(null);
+  }, []);
+
   const takeBreak = useCallback(() => {
     window.api.timer.pause();
     window.api.timer.snoozeBreak();
     setMinutesWorked(null);
   }, []);
 
-  return { minutesWorked, snooze, takeBreak };
+  return { minutesWorked, snooze, snoozeFor, takeBreak };
 }

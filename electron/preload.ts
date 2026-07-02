@@ -94,7 +94,7 @@ const api = {
         ipcRenderer.removeListener('break:prompt', listener);
       };
     },
-    snoozeBreak: (): Promise<void> => ipcRenderer.invoke('timer:snoozeBreak'),
+    snoozeBreak: (remindInMinutes?: number): Promise<void> => ipcRenderer.invoke('timer:snoozeBreak', remindInMinutes),
     onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number }) => void) => {
       const listener = (_: unknown, data: { projectId: number; idleSeconds: number }) => cb(data);
       ipcRenderer.on('idle:prompt', listener);
@@ -125,6 +125,7 @@ const api = {
   overlay: {
     setCompact: (compact: boolean): Promise<void> => ipcRenderer.invoke('overlay:setCompact', compact),
     setHeight: (height: number): Promise<void> => ipcRenderer.invoke('overlay:setHeight', height),
+    setPosition: (x: number, y: number): Promise<void> => ipcRenderer.invoke('overlay:setPosition', x, y),
     openMainWindow: (): Promise<void> => ipcRenderer.invoke('overlay:openMainWindow'),
     show: (): Promise<void> => ipcRenderer.invoke('overlay:show'),
     hide: (): Promise<void> => ipcRenderer.invoke('overlay:hide'),

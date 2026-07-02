@@ -3,6 +3,7 @@ import { useTimer } from '@/hooks/useTimer';
 import { useProjects } from '@/hooks/useProjects';
 import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { useIdlePrompt } from '@/hooks/useIdlePrompt';
+import { useOverlayDrag } from '@/hooks/useOverlayDrag';
 import { secondsToHms, minutesToHhMm, todayIso } from '@/lib/format';
 import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
@@ -13,8 +14,9 @@ import { OverlayNoteView } from './OverlayNoteView';
 export function OverlayApp() {
   const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, switchProject, start } = useTimer();
   const { projects } = useProjects();
-  const { minutesWorked, snooze, takeBreak } = useBreakPrompt();
+  const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
   const { idle, keep, discard } = useIdlePrompt();
+  const drag = useOverlayDrag();
 
   const [compact, setCompact] = useState(true);
   const [dark, setDark] = useState(false);
@@ -91,17 +93,19 @@ export function OverlayApp() {
   // No active project yet: selecting one should start timing rather than switch.
   const selectProject = project ? switchProject : start;
 
-  // Grow the overlay to fit the idle prompt, then restore to the compact/expanded size.
+  // Size the overlay to whatever it's currently showing: idle prompt, the break panel (which needs
+  // extra room below the normal widget), or the plain compact/expanded widget.
   useEffect(() => {
     if (idle) window.api.overlay.setHeight(210);
+    else if (onBreak) window.api.overlay.setHeight(390);
     else window.api.overlay.setHeight(compact ? 44 : 220);
-  }, [idle, compact]);
+  }, [idle, onBreak, compact]);
 
   if (idle) {
     const idleProject = projects.find((p) => p.id === idle.projectId);
     const idleMinutes = Math.max(1, Math.round(idle.idleSeconds / 60));
     return (
-      <div className={`${theme} flex h-full w-full flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+      <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
         <p className="text-sm font-bold text-slate-900 dark:text-white">Still working?</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
           Idle for ~{idleMinutes} min{idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?
@@ -141,7 +145,7 @@ export function OverlayApp() {
   if (compact && !onBreak) {
     return (
       <div className={`${theme} relative h-full w-full`}>
-        <div className="drag-region flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        <div {...drag} className="flex h-11 w-full select-none items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <button
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
             onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
@@ -179,8 +183,8 @@ export function OverlayApp() {
   }
 
   return (
-    <div className={`${theme} relative flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
-      <div className="drag-region relative flex h-8 shrink-0 items-center justify-center">
+    <div {...drag} className={`${theme} relative flex h-full w-full select-none flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+      <div className="relative flex h-8 shrink-0 items-center justify-center">
         <span className="h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-600" />
         <div className="no-drag absolute right-2 top-1 flex gap-1">
           <IconButton label={dark ? 'Light mode' : 'Dark mode'} className="h-6 w-6" onClick={toggleDark}>
@@ -255,25 +259,36 @@ export function OverlayApp() {
               <p className="text-xs text-slate-400">{minutesWorked} min worked</p>
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-col gap-2">
             <button
               onClick={() => {
                 takeBreak();
                 restoreCompactIfNeeded();
               }}
-              className="flex-1 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
+              className="w-full rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
             >
               Take break
             </button>
-            <button
-              onClick={() => {
-                snooze();
-                restoreCompactIfNeeded();
-              }}
-              className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              Later
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  snoozeFor(5);
+                  restoreCompactIfNeeded();
+                }}
+                className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Snooze 5m
+              </button>
+              <button
+                onClick={() => {
+                  snooze();
+                  restoreCompactIfNeeded();
+                }}
+                className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Later
+              </button>
+            </div>
           </div>
         </div>
       )}
