@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from '../icons';
 
 interface DurationInputProps {
@@ -17,17 +18,65 @@ export function DurationInput({ minutes, onChange, minMinutes = 0, maxMinutes = 
 
   return (
     <div className="flex items-center gap-2">
-      <Stepper value={hours} label="h" onIncrement={() => setTotal(total + 60)} onDecrement={() => setTotal(total - 60)} />
-      <Stepper value={mins} label="m" onIncrement={() => setTotal(total + minuteStep)} onDecrement={() => setTotal(total - minuteStep)} />
+      <Stepper
+        value={hours}
+        label="h"
+        onCommit={(h) => setTotal(h * 60 + mins)}
+        onIncrement={() => setTotal(total + 60)}
+        onDecrement={() => setTotal(total - 60)}
+      />
+      <Stepper
+        value={mins}
+        label="m"
+        onCommit={(m) => setTotal(hours * 60 + m)}
+        onIncrement={() => setTotal(total + minuteStep)}
+        onDecrement={() => setTotal(total - minuteStep)}
+      />
     </div>
   );
 }
 
-function Stepper({ value, label, onIncrement, onDecrement }: { value: number; label: string; onIncrement: () => void; onDecrement: () => void }) {
+function Stepper({
+  value,
+  label,
+  onCommit,
+  onIncrement,
+  onDecrement,
+}: {
+  value: number;
+  label: string;
+  onCommit: (value: number) => void;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}) {
+  // Local text so the user can clear the field and type freely; commit (and re-clamp) on blur/Enter.
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
+  const commit = () => {
+    const parsed = parseInt(text, 10);
+    if (Number.isNaN(parsed)) setText(String(value));
+    else onCommit(parsed);
+  };
+
   return (
-    <div className="flex items-center rounded-lg border border-slate-200 bg-white">
-      <div className="w-14 px-3 py-2 text-right text-sm font-medium tabular-nums text-slate-900">
-        {value}
+    <div className="flex items-center rounded-lg border border-slate-200 bg-white focus-within:border-amber">
+      <div className="flex items-center px-3 py-2 text-right text-sm font-medium tabular-nums text-slate-900">
+        <input
+          type="text"
+          inputMode="numeric"
+          aria-label={label === 'h' ? 'Hours' : 'Minutes'}
+          value={text}
+          onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ''))}
+          onFocus={(e) => e.target.select()}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            else if (e.key === 'ArrowUp') { e.preventDefault(); onIncrement(); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); onDecrement(); }
+          }}
+          className="w-8 bg-transparent text-right outline-none"
+        />
         <span className="ml-1 text-xs font-normal text-slate-400">{label}</span>
       </div>
       <div className="flex flex-col border-l border-slate-200">
