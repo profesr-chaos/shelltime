@@ -61,6 +61,7 @@ export interface Settings {
   workingDays: number[];
   skipBankHolidays: boolean;
   holidayRegion: string; // "GB-ENG", "IE", "US" … country code, optionally "-STATE"
+  hasCompletedSetup: boolean; // false until the user has reviewed the essential settings
 }
 
 export const OVERLAY_OPACITY_FLOOR = 0.3;

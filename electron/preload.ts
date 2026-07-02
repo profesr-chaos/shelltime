@@ -58,6 +58,13 @@ const api = {
   settings: {
     get: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
     update: (patch: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke('settings:update', patch),
+    onChanged: (cb: (settings: Settings) => void) => {
+      const listener = (_: unknown, settings: Settings) => cb(settings);
+      ipcRenderer.on('settings:changed', listener);
+      return () => {
+        ipcRenderer.removeListener('settings:changed', listener);
+      };
+    },
   },
   targets: {
     getDailyStatus: (date: string) => ipcRenderer.invoke('targets:getDailyStatus', date),

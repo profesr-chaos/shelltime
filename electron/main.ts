@@ -258,6 +258,7 @@ function registerIpc() {
       }
       if ('overlayOpacity' in patch) overlayWindow.setOpacity(updated.overlayOpacity);
     }
+    broadcast('settings:changed', updated);
     return updated;
   });
 

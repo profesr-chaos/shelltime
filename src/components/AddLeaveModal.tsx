@@ -59,14 +59,12 @@ export function AddLeaveModal({ month, onClose, onChanged }: { month: string; on
         onDayHover={(d) => rangeStart && setHoverEnd(d ?? rangeStart)}
       />
 
-      <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+      <label className="mt-3 flex items-center gap-2 text-sm text-slate-700" title="Books ½ your daily target for each selected day">
         <input type="checkbox" checked={half} onChange={(e) => setHalf(e.target.checked)} className="h-4 w-4 accent-amber-500" />
-        Half day (books ½ your daily target)
+        Half day
       </label>
       <p className="mt-1 text-xs text-slate-400">
-        {rangeStart
-          ? 'Now click the end day (or the same day for a single day).'
-          : 'Click a start day, then an end day. Weekends and public holidays are skipped.'}
+        {rangeStart ? 'Now pick the end day.' : 'Pick a start day, then an end day.'}
       </p>
     </Modal>
   );

@@ -139,8 +139,9 @@ export function Today() {
             {remainingMinutes <= 0 ? 'Target reached' : `${Math.round(pct * 100)}% · ${minutesToHhMm(remainingMinutes)} remaining`}
           </span>
         </div>
-        <ProgressBar fraction={pct} tone="amber" paused={timerState.status === 'paused'} onSeek={handleSeek} previewFraction={seekPreview} />
-        <p className="mt-3 text-xs text-slate-400">Drag the snail to reassign tracked time between projects.</p>
+        <div title="Drag the snail to reassign tracked time between projects">
+          <ProgressBar fraction={pct} tone="amber" paused={timerState.status === 'paused'} onSeek={handleSeek} previewFraction={seekPreview} />
+        </div>
       </div>
 
       <div className="mt-10">

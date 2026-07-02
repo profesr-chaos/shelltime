@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: Settings = {
   workingDays: [1, 2, 3, 4, 5],
   skipBankHolidays: true,
   holidayRegion: 'GB-ENG',
+  hasCompletedSetup: false,
 };
 
 export function clampOverlayOpacity(value: number): number {
@@ -107,11 +108,10 @@ export function initDb(userDataDir: string) {
 
   runMigrations();
   seedSettingsDefaults();
-  seedDemoDataIfEmpty();
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [
@@ -142,51 +142,17 @@ function runMigrations() {
         for (const row of rows) if (!covered[p.code].has(row.date)) del.run(p.id, row.date);
       }
     },
+    // migrations[3]: v3 -> v4 — existing users (who already have projects) shouldn't see first-run
+    // onboarding, so mark setup complete for them; genuinely fresh installs keep the default (false).
+    () => {
+      const hasData = (db.prepare('SELECT COUNT(*) AS c FROM projects').get() as { c: number }).c > 0;
+      if (hasData) {
+        db.prepare("INSERT INTO settings (key, value) VALUES ('hasCompletedSetup', 'true') ON CONFLICT(key) DO UPDATE SET value = 'true'").run();
+      }
+    },
   ];
   for (let v = current; v < SCHEMA_VERSION; v++) migrations[v]?.();
   if (current < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
-}
-
-const DEMO_NOTES = [
-  'Wrote tender responses for questions 1 and 2.',
-  'Reviewed commercial assumptions.',
-  'Updated project tracker and risk notes.',
-];
-
-function seedDemoDataIfEmpty() {
-  const existing = db.prepare('SELECT COUNT(*) as c FROM projects').get() as any;
-  if (existing.c > 0) return;
-
-  const demoProjects = [
-    createProject({ code: 'GC-TENDER', name: 'General Construction Tender Phase 2', color: '#F5941E' }),
-    createProject({ code: 'OPS-ADMIN', name: 'Operational Administration & Internal', color: '#3B82F6' }),
-    createProject({ code: 'BD-2026', name: 'Business Development Strategy', color: '#10B981' }),
-    createProject({ code: 'PERSONAL', name: 'Personal', color: '#94A3B8' }),
-  ];
-
-  const today = new Date();
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const cursor = new Date(monthStart);
-  let noteIdx = 0;
-
-  while (cursor < todayMidnight) {
-    const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    if (isWorkingDay(dateStr)) {
-      const dailyBudget = 6.5 * 60 + Math.random() * 3 * 60; // 6.5h - 9.5h
-      const weights = demoProjects.map(() => Math.random());
-      const weightSum = weights.reduce((a, b) => a + b, 0);
-      demoProjects.forEach((p, i) => {
-        const minutes = Math.round((weights[i] / weightSum) * dailyBudget);
-        if (minutes > 5) setDailyEntry(dateStr, p.id, minutes, 'timer');
-      });
-      if (Math.random() < 0.3) {
-        addNote(dateStr, demoProjects[0].id, DEMO_NOTES[noteIdx % DEMO_NOTES.length]);
-        noteIdx++;
-      }
-    }
-    cursor.setDate(cursor.getDate() + 1);
-  }
 }
 
 function now() {

@@ -51,6 +51,10 @@ export function Settings() {
     window.api.settings.update(patch).then(() => toast('Settings saved'));
   };
 
+  // Changing an essential setting also marks setup complete, clearing the "!" prompts.
+  const updateEssential = (patch: Partial<SettingsType>) => update({ ...patch, hasCompletedSetup: true });
+  const needsSetup = !settings.hasCompletedSetup;
+
   const updateDebounced = (patch: Partial<SettingsType>) => {
     setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -64,7 +68,7 @@ export function Settings() {
       <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
 
       <Section title="Working schedule">
-        <FieldWrap label="Working days" hint={`${settings.workingDays.length} days a week - used to calculate expected weekly/monthly hours`}>
+        <FieldWrap label="Working days" alert={needsSetup} tooltip="Used to calculate your expected weekly and monthly hours.">
           <div className="flex gap-2">
             {DAYS.map(({ day, label }) => {
               const selected = settings.workingDays.includes(day);
@@ -76,7 +80,7 @@ export function Settings() {
                     const next = selected
                       ? settings.workingDays.filter((d) => d !== day)
                       : [...settings.workingDays, day].sort();
-                    update({ workingDays: next });
+                    updateEssential({ workingDays: next });
                   }}
                   className={`h-10 w-12 rounded-lg text-sm font-medium transition-colors ${
                     selected ? 'bg-amber text-white' : 'border border-slate-200 text-slate-500 hover:bg-slate-50'
@@ -95,15 +99,12 @@ export function Settings() {
             onChange={(v) => update({ skipBankHolidays: v })}
             label="Skip public holidays"
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Public holidays for your region won't count as working days, so they're excluded from monthly targets.
-          </p>
           {settings.skipBankHolidays && (
-            <FieldWrap label="Holiday region">
+            <FieldWrap label="Holiday region" alert={needsSetup} tooltip="Public holidays for this region are skipped when calculating targets.">
               <div className="flex flex-wrap gap-2">
                 <Select
                   value={holidayCountry}
-                  onChange={(e) => update({ holidayRegion: e.target.value })}
+                  onChange={(e) => updateEssential({ holidayRegion: e.target.value })}
                   className="max-w-xs"
                 >
                   {countries.map((c) => (
@@ -113,7 +114,7 @@ export function Settings() {
                 {states.length > 0 && (
                   <Select
                     value={settings.holidayRegion.includes('-') ? settings.holidayRegion.slice(holidayCountry.length + 1) : ''}
-                    onChange={(e) => update({ holidayRegion: e.target.value ? `${holidayCountry}-${e.target.value}` : holidayCountry })}
+                    onChange={(e) => updateEssential({ holidayRegion: e.target.value ? `${holidayCountry}-${e.target.value}` : holidayCountry })}
                     className="max-w-xs"
                   >
                     <option value="">Whole country</option>
@@ -129,10 +130,10 @@ export function Settings() {
       </Section>
 
       <Section title="Targets">
-        <FieldWrap label="Default daily target" hint="Applied to every day unless overridden">
+        <FieldWrap label="Default daily target" alert={needsSetup} tooltip="Applied to every working day unless a specific day is overridden.">
           <DurationInput
             minutes={settings.defaultDailyTargetMinutes}
-            onChange={(minutes) => update({ defaultDailyTargetMinutes: minutes })}
+            onChange={(minutes) => updateEssential({ defaultDailyTargetMinutes: minutes })}
             maxMinutes={16 * 60}
           />
         </FieldWrap>
@@ -187,7 +188,7 @@ export function Settings() {
           onChange={(v) => update({ grindMode: v })}
           label={settings.grindMode ? 'Grind mode is ON - break reminders are suppressed' : 'Grind mode'}
         />
-        <FieldWrap label="Auto-pause when idle" hint="Pause a running timer after this much inactivity (or on sleep/lock). Set to 0 to disable.">
+        <FieldWrap label="Auto-pause when idle" tooltip="Pauses a running timer after this much inactivity, or on sleep/lock. Set to 0 to disable.">
           <DurationInput
             minutes={settings.autoPauseIdleMinutes}
             onChange={(minutes) => update({ autoPauseIdleMinutes: Math.max(0, minutes) })}
@@ -200,7 +201,7 @@ export function Settings() {
       <Section title="Overlay">
         <Toggle checked={settings.overlayAlwaysOnTop} onChange={(v) => update({ overlayAlwaysOnTop: v })} label="Always on top" />
         <Toggle checked={settings.overlayCompact} onChange={(v) => update({ overlayCompact: v })} label="Compact mode" />
-        <FieldWrap label="Overlay opacity" hint={`Can't go below ${Math.round(OVERLAY_OPACITY_FLOOR * 100)}% so it never disappears entirely`}>
+        <FieldWrap label="Overlay opacity" tooltip={`Can't go below ${Math.round(OVERLAY_OPACITY_FLOOR * 100)}% so it never disappears entirely.`}>
           <div className="flex items-center gap-3">
             <input
               type="range"

@@ -9,7 +9,7 @@ const NAV: { page: Page; label: string; icon: typeof CalendarIcon }[] = [
   { page: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-export function Sidebar({ page, onNavigate, projectCount }: { page: Page; onNavigate: (p: Page) => void; projectCount: number }) {
+export function Sidebar({ page, onNavigate, projectCount, settingsAlert }: { page: Page; onNavigate: (p: Page) => void; projectCount: number; settingsAlert?: boolean }) {
   return (
     <aside className="flex w-60 shrink-0 flex-col bg-ink-900 px-4 py-6 text-slate-300">
       <div className="mb-8 flex items-center gap-2 px-2">
@@ -33,6 +33,9 @@ export function Sidebar({ page, onNavigate, projectCount }: { page: Page; onNavi
               </span>
               {p === 'projects' && projectCount > 0 && (
                 <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-300">{projectCount}</span>
+              )}
+              {p === 'settings' && settingsAlert && (
+                <span title="Set up your working schedule, region and target" className="flex h-5 w-5 items-center justify-center rounded-full bg-amber text-xs font-bold text-white">!</span>
               )}
             </button>
           );
