@@ -71,7 +71,7 @@ export function OverlayApp() {
   // Persist the theme; the settings:changed broadcast updates `dark` (here and in the main window).
   const toggleDark = () => window.api.settings.update({ overlayDark: !dark });
 
-  // Compact mode is a 44px-tall window, too short for a dropdown — grow it while the switch menu is open, then restore.
+  // Compact mode is a 32px-tall window, too short for a dropdown — grow it while the switch menu is open, then restore.
   const COMPACT_MENU_HEIGHT = 320;
   const openCompactSwitch = () => {
     setSwitchOpen(true);
@@ -79,7 +79,7 @@ export function OverlayApp() {
   };
   const closeCompactSwitch = () => {
     setSwitchOpen(false);
-    window.api.overlay.setHeight(44);
+    window.api.overlay.setHeight(32);
   };
 
   // QuickSwitchMenu closes on clicks inside the overlay; also close (and shrink) when the
@@ -102,7 +102,7 @@ export function OverlayApp() {
   useEffect(() => {
     if (idle || onResume) window.api.overlay.setHeight(210);
     else if (onBreak) window.api.overlay.setHeight(390);
-    else window.api.overlay.setHeight(compact ? 44 : 220);
+    else window.api.overlay.setHeight(compact ? 32 : 220);
   }, [idle, onResume, onBreak, compact]);
 
   if (onResume) {
@@ -119,7 +119,7 @@ export function OverlayApp() {
             onClick={resumePrompt.keep}
             className="no-drag flex-1 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
           >
-            Keep going
+            Resume work
           </button>
           <button
             onClick={resumePrompt.reject}
@@ -177,14 +177,23 @@ export function OverlayApp() {
   if (compact && !onBreak) {
     return (
       <div className={`${theme} relative h-full w-full`}>
-        <div {...drag} className="flex h-11 w-full select-none items-center gap-2 rounded-full border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+      <div {...drag} className="flex h-8 w-full select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <button
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
             onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
           >
-            {project ? <ColorDot color={project.color} /> : null}
-            <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{project?.code ?? 'Choose project'}</span>
+            {project ? (
+              <>
+                <ColorDot color={project.color} />
+                <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{project.code}</span>
+              </>
+            ) : (
+              <span className="truncate rounded-md border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-500 hover:border-amber hover:text-amber dark:border-slate-600 dark:text-slate-300">
+                Choose project
+              </span>
+            )}
           </button>
+          
           <IconButton label="Expand" className="no-drag h-6 w-6 shrink-0" onClick={() => toggleCompact(false)}>
             <ExpandIcon width={14} height={14} />
           </IconButton>

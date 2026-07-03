@@ -20,8 +20,7 @@ export function BottomTimerBar() {
       <div className="fixed inset-y-auto bottom-0 left-60 right-0 z-30 flex items-center justify-between border-t border-slate-200 bg-white px-8 py-4 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
         <p className="text-sm text-slate-400">No active timer</p>
         <div className="flex items-center gap-3">
-          <Button variant="secondary" icon={<ExpandIcon />} onClick={() => window.api.overlay.show()}>
-            Pop out
+          <Button title="Pop out" variant="secondary" icon={<ExpandIcon />} onClick={() => window.api.overlay.show()}>
           </Button>
           <div className="relative">
             <Button variant="primary" icon={<PlayIcon />} onClick={() => setStartOpen((v) => !v)}>
@@ -54,15 +53,14 @@ export function BottomTimerBar() {
       <div className="font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(liveActiveSeconds)}</div>
 
       <div className="flex items-center gap-3">
-        <Button variant="secondary" icon={<ExpandIcon />} onClick={() => window.api.overlay.show()}>
-          Pop out
+        <Button title="Pop out" variant="secondary" icon={<ExpandIcon />} onClick={() => window.api.overlay.show()}>
+    
         </Button>
-        <Button variant="secondary" icon={<NoteIcon />} onClick={() => setNoteOpen(true)}>
-          Add Note
+        <Button title="Add comment" variant="secondary"  onClick={() => setNoteOpen(true)}>
+          💬
         </Button>
         <div className="relative">
-          <Button variant="secondary" icon={<SwitchIcon />} onClick={() => setSwitchOpen((v) => !v)}>
-            Switch
+          <Button title="Switch project" variant="secondary" icon={<SwitchIcon />} onClick={() => setSwitchOpen((v) => !v)}>
           </Button>
           {switchOpen && (
             <QuickSwitchMenu
