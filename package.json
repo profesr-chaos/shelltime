@@ -1,7 +1,7 @@
 {
   "name": "shelltime",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "Shelltime — low-friction time tracking for project-based work",
   "author": "Adam Tweedie",
   "main": "dist-electron/main.js",
@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/logic.test.mts",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/logic.test.mts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/attentionMonitor.test.mts",
     "dist": "npm run build && electron-builder --win"
   },
   "build": {

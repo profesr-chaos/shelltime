@@ -74,6 +74,9 @@ const api = {
     getMonthly: (month: string): Promise<number> => ipcRenderer.invoke('targets:getMonthly', month),
     setMonthlyOverride: (month: string, minutes: number | null) => ipcRenderer.invoke('targets:setMonthlyOverride', month, minutes),
   },
+  day: {
+    getFirstStart: (date: string): Promise<string | null> => ipcRenderer.invoke('day:getFirstStart', date),
+  },
   timer: {
     getState: (): Promise<TimerState> => ipcRenderer.invoke('timer:getState'),
     start: (projectId: number): Promise<void> => ipcRenderer.invoke('timer:start', projectId),
@@ -95,8 +98,15 @@ const api = {
       };
     },
     snoozeBreak: (remindInMinutes?: number): Promise<void> => ipcRenderer.invoke('timer:snoozeBreak', remindInMinutes),
-    onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number }) => void) => {
-      const listener = (_: unknown, data: { projectId: number; idleSeconds: number }) => cb(data);
+    onBreakDismissed: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('break:dismissed', listener);
+      return () => {
+        ipcRenderer.removeListener('break:dismissed', listener);
+      };
+    },
+    onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number; frozen: boolean }) => void) => {
+      const listener = (_: unknown, data: { projectId: number; idleSeconds: number; frozen: boolean }) => cb(data);
       ipcRenderer.on('idle:prompt', listener);
       return () => {
         ipcRenderer.removeListener('idle:prompt', listener);
@@ -109,8 +119,7 @@ const api = {
         ipcRenderer.removeListener('idle:resolved', listener);
       };
     },
-    resolveIdle: (discard: boolean, projectId: number, idleSeconds: number, resume: boolean): Promise<void> =>
-      ipcRenderer.invoke('timer:resolveIdle', discard, projectId, idleSeconds, resume),
+    resolveIdle: (discard: boolean): Promise<void> => ipcRenderer.invoke('timer:resolveIdle', discard),
     onResumePrompt: (cb: (data: { projectId: number }) => void) => {
       const listener = (_: unknown, data: { projectId: number }) => cb(data);
       ipcRenderer.on('resume:prompt', listener);

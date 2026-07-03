@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { MonthlySummary } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
-import { currentMonthStr, shiftMonth, formatMonth, minutesToHoursLabel, signedHoursLabel, formatDateShort } from '@/lib/format';
+import { currentMonthStr, shiftMonth, formatMonth, minutesToHhMm, signedMinutesToHhMm, formatDateShort } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
@@ -33,6 +33,8 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
 
   const efficiencyPct = summary.targetMinutes > 0 ? Math.round((summary.actualMinutes / summary.targetMinutes) * 100) : 0;
   const overtimeDeltaMinutes = summary.thisMonthOvertimeMinutes - summary.lastMonthOvertimeMinutes;
+  const overtimeDeltaPct = overtimeDeltaMinutes / 60;
+  const overtimeDeltaPctLabel = `${overtimeDeltaPct >= 0 ? '+' : ''}${overtimeDeltaPct.toFixed(1)}%`;
 
   const donutSegments = [
     ...summary.byProject.map((bp) => ({ label: bp.project.code, minutes: bp.minutes, color: bp.project.color })),
@@ -58,20 +60,20 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
       </div>
 
       <div className="mt-6 grid grid-cols-4 gap-4">
-        <StatCard label="Monthly Target" value={minutesToHoursLabel(summary.targetMinutes)} />
+        <StatCard label="Monthly Target" value={minutesToHhMm(summary.targetMinutes)} />
         <StatCard
           label="Actual Tracked"
-          value={minutesToHoursLabel(summary.actualMinutes)}
-          delta={signedHoursLabel(summary.actualMinutes - summary.targetMinutes)}
+          value={minutesToHhMm(summary.actualMinutes)}
+          delta={signedMinutesToHhMm(summary.actualMinutes - summary.targetMinutes)}
           deltaTone={summary.actualMinutes >= summary.targetMinutes ? 'good' : 'bad'}
         />
         <StatCard
           label="Efficiency"
           value={`${efficiencyPct}%`}
-          delta={signedHoursLabel(overtimeDeltaMinutes).replace('h', '%')}
+          delta={overtimeDeltaPctLabel}
           deltaTone={overtimeDeltaMinutes >= 0 ? 'good' : 'bad'}
         />
-        <StatCard label="Last Month" value={minutesToHoursLabel(summary.lastMonthActualMinutes)} />
+        <StatCard label="Last Month" value={minutesToHhMm(summary.lastMonthActualMinutes)} />
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-6">
@@ -79,7 +81,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
           <h2 className="mb-4 text-base font-bold text-slate-900">Hours by Project</h2>
           <DonutChart
             segments={donutSegments}
-            centerTop={`${minutesToHoursLabel(summary.actualMinutes)} / ${minutesToHoursLabel(summary.targetMinutes)}`}
+            centerTop={`${minutesToHhMm(summary.actualMinutes)} / ${minutesToHhMm(summary.targetMinutes)}`}
             centerBottom="tracked / target"
           />
           <div className="mt-6 flex flex-col gap-2">
@@ -89,7 +91,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
                   <ColorDot color={seg.color} />
                   <span className={seg.label === 'Remaining' ? 'text-slate-400' : 'font-medium text-slate-700'}>{seg.label}</span>
                 </span>
-                <span className="text-slate-500">{minutesToHoursLabel(seg.minutes)}</span>
+                <span className="text-slate-500">{minutesToHhMm(seg.minutes)}</span>
               </div>
             ))}
           </div>
@@ -102,7 +104,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm">
               <TrendUpIcon className="text-emerald-600" width={16} height={16} />
               <span>
-                <span className="font-semibold"></span> You worked {minutesToHoursLabel(Math.abs(overtimeDeltaMinutes))}{' '}
+                <span className="font-semibold"></span> You worked {minutesToHhMm(Math.abs(overtimeDeltaMinutes))}{' '}
                 {overtimeDeltaMinutes > 0 ? 'more' : 'less'} than last month.
               </span>
             </div>
@@ -115,7 +117,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
         <InsightCard label="Busiest day" value={summary.insights.busiestDay ? formatDateShort(summary.insights.busiestDay) : '—'} />
         <InsightCard label="Quietest day" value={summary.insights.quietestDay ? formatDateShort(summary.insights.quietestDay) : '—'} />
         <InsightCard label="Project switches" value={String(summary.insights.projectSwitches)} />
-        <InsightCard label="Avg / working day" value={minutesToHoursLabel(summary.insights.averageMinutesPerWorkingDay)} />
+        <InsightCard label="Avg / working day" value={minutesToHhMm(summary.insights.averageMinutesPerWorkingDay)} />
       </div>
 
       <div className="mt-6">

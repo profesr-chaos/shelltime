@@ -15,7 +15,7 @@ export function IdlePromptModal() {
 
   return (
     <Modal
-      title="Still working?"
+      title={idle.frozen ? 'Welcome back' : 'Still working?'}
       subtitle={project ? `${project.code} - ${project.name}` : undefined}
       onClose={keep}
       footer={
@@ -26,10 +26,17 @@ export function IdlePromptModal() {
       }
     >
       <p className="text-center font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
-      <p className="mt-3 text-sm text-slate-600">
-        No mouse or keyboard activity - the timer is still running. If you were in a meeting, keep the time. If you
-        stepped away, discard it - then timing continues.
-      </p>
+      {idle.frozen ? (
+        <p className="mt-3 text-sm text-slate-600">
+          Away for a while - the timer paused. Keep the banked time if you were in a meeting, or discard it if you
+          stepped away.
+        </p>
+      ) : (
+        <p className="mt-3 text-sm text-slate-600">
+          No mouse or keyboard activity - the timer is still running. If you were in a meeting, keep the time. If you
+          stepped away, discard it - then timing continues.
+        </p>
+      )}
     </Modal>
   );
 }

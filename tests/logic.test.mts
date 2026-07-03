@@ -1,7 +1,7 @@
 // Plain assert self-check for the pure time/holiday logic. Run: npm test
 // (No framework; Node strips the TS types. DB-backed code needs Electron's better-sqlite3 so isn't covered here.)
 import assert from 'node:assert/strict';
-import { minutesToHhMm, secondsToHms, signedHoursLabel, shiftMonth, workdayNumberOfYear } from '../src/lib/format.ts';
+import { minutesToHhMm, signedMinutesToHhMm, secondsToHms, shiftMonth, workdayNumberOfYear } from '../src/lib/format.ts';
 import { isPublicHoliday } from '../electron/holidays.ts';
 
 let passed = 0;
@@ -15,10 +15,13 @@ const t = (name: string, fn: () => void) => {
   passed++;
 };
 
-t('minutesToHhMm', () => {
-  assert.equal(minutesToHhMm(0), '0h 0m');
-  assert.equal(minutesToHhMm(90), '1h 30m');
-  assert.equal(minutesToHhMm(-90), '-1h 30m');
+t('minutesToHhMm always shows minutes, never a decimal-hour fraction', () => {
+  assert.equal(minutesToHhMm(0), '0:00');
+  assert.equal(minutesToHhMm(54), '0:54');
+  assert.equal(minutesToHhMm(450), '7:30');
+  assert.equal(minutesToHhMm(-65), '-1:05');
+  assert.equal(minutesToHhMm(168.5 * 60), '168:30'); // hours don't wrap at 24
+  assert.equal(minutesToHhMm(89.6), '1:30'); // rounds fractional minutes
 });
 
 t('secondsToHms zero-pads', () => {
@@ -26,10 +29,11 @@ t('secondsToHms zero-pads', () => {
   assert.equal(secondsToHms(3661), '01:01:01');
 });
 
-t('signedHoursLabel', () => {
-  assert.equal(signedHoursLabel(120), '+2.0h');
-  assert.equal(signedHoursLabel(-90), '-1.5h');
-  assert.equal(signedHoursLabel(0), '0h');
+t('signedMinutesToHhMm', () => {
+  assert.equal(signedMinutesToHhMm(120), '+2:00');
+  assert.equal(signedMinutesToHhMm(-90), '-1:30');
+  assert.equal(signedMinutesToHhMm(0), '0:00');
+  assert.equal(signedMinutesToHhMm(-65), '-1:05');
 });
 
 t('shiftMonth wraps the year', () => {

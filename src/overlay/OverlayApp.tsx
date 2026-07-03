@@ -137,9 +137,11 @@ export function OverlayApp() {
     const idleMinutes = Math.max(1, Math.round(liveIdleSeconds / 60));
     return (
       <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
-        <p className="text-sm font-bold text-slate-900 dark:text-white">Still working?</p>
+        <p className="text-sm font-bold text-slate-900 dark:text-white">{idle.frozen ? 'Welcome back' : 'Still working?'}</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-          Idle{idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?
+          {idle.frozen
+            ? `Away${idleProject ? ` on ${idleProject.code}` : ''} - keep the banked time or discard it?`
+            : `Idle${idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?`}
         </p>
         <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
         <div className="mt-3 flex gap-2">

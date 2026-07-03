@@ -23,7 +23,7 @@ const DEFAULT_COLORS = ['#F5941E', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6', '
 const DEFAULT_SETTINGS: Settings = {
   defaultDailyTargetMinutes: 480,
   breakIntervalMinutes: 60,
-  autoPauseIdleMinutes: 10,
+  idlePromptMinutes: 10,
   idleResumeMode: 'auto',
   grindMode: false,
   overlayAlwaysOnTop: true,
@@ -108,6 +108,11 @@ export function initDb(userDataDir: string) {
       half INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS day_meta (
+      date TEXT PRIMARY KEY,
+      first_started_at TEXT NOT NULL
+    );
   `);
 
   runMigrations();
@@ -115,7 +120,7 @@ export function initDb(userDataDir: string) {
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [
@@ -152,6 +157,15 @@ function runMigrations() {
       const hasData = (db.prepare('SELECT COUNT(*) AS c FROM projects').get() as { c: number }).c > 0;
       if (hasData) {
         db.prepare("INSERT INTO settings (key, value) VALUES ('hasCompletedSetup', 'true') ON CONFLICT(key) DO UPDATE SET value = 'true'").run();
+      }
+    },
+    // migrations[4]: v4 -> v5 — rename autoPauseIdleMinutes to idlePromptMinutes (the setting no
+    // longer auto-pauses; it opens the idle prompt, so the old name no longer matched behavior).
+    () => {
+      const row = db.prepare("SELECT value FROM settings WHERE key = 'autoPauseIdleMinutes'").get() as { value: string } | undefined;
+      if (row) {
+        db.prepare("INSERT INTO settings (key, value) VALUES ('idlePromptMinutes', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(row.value);
+        db.prepare("DELETE FROM settings WHERE key = 'autoPauseIdleMinutes'").run();
       }
     },
   ];
@@ -440,6 +454,18 @@ export function getDailyTotalMinutes(date: string): number {
     .prepare('SELECT COALESCE(SUM(duration_minutes), 0) as total FROM daily_project_time WHERE date = ?')
     .get(date) as any;
   return row.total as number;
+}
+
+// ---------- day metadata (first timer start of the day, for the progress bar's start/end labels) ----------
+
+export function getDayFirstStartedAt(date: string): string | null {
+  const row = db.prepare('SELECT first_started_at FROM day_meta WHERE date = ?').get(date) as { first_started_at: string } | undefined;
+  return row?.first_started_at ?? null;
+}
+
+/** Called from TimerEngine.start/switchProject — a no-op once today's first start is already recorded. */
+export function recordDayFirstStartIfNeeded(date: string): void {
+  db.prepare('INSERT OR IGNORE INTO day_meta (date, first_started_at) VALUES (?, ?)').run(date, now());
 }
 
 export function setDailyEntry(date: string, projectId: number, durationMinutes: number, source: EntrySource): DailyEntry {

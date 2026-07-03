@@ -1,9 +1,28 @@
+// h:mm — the one duration format used everywhere in the UI. Minutes are never dropped to a
+// decimal-hour fraction (no "0.9h"); hours don't wrap at 24 (a month can read "168:30").
 export function minutesToHhMm(totalMinutes: number): string {
   const sign = totalMinutes < 0 ? '-' : '';
   const abs = Math.round(Math.abs(totalMinutes));
   const h = Math.floor(abs / 60);
   const m = abs % 60;
-  return `${sign}${h}h ${m}m`;
+  return `${sign}${h}:${String(m).padStart(2, '0')}`;
+}
+
+// Signed h:mm for deltas: +0:45 / -1:05 / 0:00.
+export function signedMinutesToHhMm(totalMinutes: number): string {
+  const rounded = Math.round(totalMinutes);
+  if (rounded === 0) return '0:00';
+  const sign = rounded > 0 ? '+' : '-';
+  const abs = Math.abs(rounded);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `${sign}${h}:${String(m).padStart(2, '0')}`;
+}
+
+// Clock time (24h, HH:mm) — for "when did work start/end", distinct from the h:mm duration format above.
+export function formatClockTime(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 export function secondsToHms(totalSeconds: number): string {
@@ -12,18 +31,6 @@ export function secondsToHms(totalSeconds: number): string {
   const mm = Math.floor((s % 3600) / 60);
   const ss = s % 60;
   return [hh, mm, ss].map((n) => String(n).padStart(2, '0')).join(':');
-}
-
-export function minutesToHoursLabel(minutes: number): string {
-  return `${(minutes / 60).toFixed(1)}h`;
-}
-
-export function signedHoursLabel(minutes: number): string {
-  const hours = minutes / 60;
-  const rounded = Math.round(hours * 10) / 10;
-  if (rounded > 0) return `+${rounded.toFixed(1)}h`;
-  if (rounded < 0) return `${rounded.toFixed(1)}h`;
-  return '0h';
 }
 
 

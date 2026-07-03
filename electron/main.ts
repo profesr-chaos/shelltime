@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, powerMonitor, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, screen, powerMonitor } from 'electron';
 import path from 'node:path';
 import * as db from './db';
 import { TimerEngine } from './timer';
+import { AttentionMonitor } from './attentionMonitor';
 import { listCountries, listStates } from './holidays';
 
 // Wrap every IPC handler so a thrown error is logged in the main process (and still rejects the
@@ -26,6 +27,7 @@ let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let timer: TimerEngine;
+let attention: AttentionMonitor;
 let overlaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function todayStr(): string {
@@ -119,7 +121,16 @@ function createTray() {
         {
           label: state.status === 'running' ? 'Pause timer' : 'Resume timer',
           enabled: state.activeProjectId !== null,
-          click: () => (state.status === 'running' ? timer.pause() : timer.resume()),
+          click: () => {
+            if (state.status === 'running') {
+              timer.pause();
+              attention.notifyManualPause();
+            } else {
+              timer.resume();
+              attention.notifyManualResume();
+            }
+            broadcast('timer:update', timer.getState());
+          },
         },
         { type: 'separator' },
         {
@@ -158,74 +169,8 @@ function exportPrefix(): string {
   return raw.replace(/[\\/:*?"<>|]/g, '').trim() || 'Shelltime';
 }
 
-function pauseTimerForIdle() {
-  if (timer.getState().status !== 'running') return;
-  timer.pause();
-  broadcast('timer:update', timer.getState());
-}
-
-// Sleep/lock means you're definitely away — silently pause. Plain input-idle is ambiguous (a 2-hour
-// meeting looks the same as walking away), so we DON'T pause: the timer keeps running while we prompt,
-// so the full idle window is known and the user keeps it (a meeting) or discards all of it (away).
-let idlePromptOpen = false;
-let idlePromptStartedAt: number | null = null; // epoch ms the idle window began
-
-function promptIdle() {
-  if (timer.getState().status !== 'running') return;
-  const projectId = timer.getState().activeProjectId;
-  if (projectId === null) return;
-  const idleSeconds = Math.round(powerMonitor.getSystemIdleTime());
-  idlePromptOpen = true;
-  idlePromptStartedAt = Date.now() - idleSeconds * 1000;
+function showOverlayForPrompt() {
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
-  broadcast('idle:prompt', { projectId, idleSeconds });
-}
-
-function startIdleMonitor() {
-  powerMonitor.on('suspend', pauseTimerForIdle);
-  powerMonitor.on('lock-screen', pauseTimerForIdle);
-  setInterval(() => {
-    if (idlePromptOpen) return;
-    const idleMinutes = db.getSettings().autoPauseIdleMinutes;
-    if (idleMinutes <= 0) return;
-    if (powerMonitor.getSystemIdleTime() >= idleMinutes * 60) promptIdle();
-  }, 30_000);
-}
-
-// While paused, watch for the user coming back. We only "arm" once they've actually gone idle
-// (so a manual pause while sitting at the desk doesn't instantly resume), then fire when fresh
-// input arrives. 'auto' resumes silently; 'prompt' resumes but asks to keep-or-discard the time.
-const RESUME_ARM_IDLE_SECONDS = 15; // must have been idle at least this long to arm
-const RESUME_ACTIVE_SECONDS = 3; // input newer than this counts as "back to work"
-let resumeArmed = false;
-let resumePromptOpen = false;
-let resumePromptStartedAt: number | null = null;
-
-function startResumeMonitor() {
-  setInterval(() => {
-    if (resumePromptOpen || idlePromptOpen) return;
-    const state = timer.getState();
-    if (state.status !== 'paused' || state.activeProjectId === null) {
-      resumeArmed = false;
-      return;
-    }
-    const mode = db.getSettings().idleResumeMode;
-    if (mode === 'off') return;
-    const idle = powerMonitor.getSystemIdleTime();
-    if (idle >= RESUME_ARM_IDLE_SECONDS) {
-      resumeArmed = true;
-    } else if (resumeArmed && idle < RESUME_ACTIVE_SECONDS) {
-      resumeArmed = false;
-      timer.resume();
-      broadcast('timer:update', timer.getState());
-      if (mode === 'prompt') {
-        resumePromptOpen = true;
-        resumePromptStartedAt = Date.now();
-        if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
-        broadcast('resume:prompt', { projectId: state.activeProjectId });
-      }
-    }
-  }, 2000);
 }
 
 function registerIpc() {
@@ -250,6 +195,7 @@ function registerIpc() {
     broadcast('projects:changed');
     if (timer.getState().activeProjectId === id) {
       timer.stopIfActiveProjectMissing();
+      attention.notifyStop();
       broadcast('timer:update', timer.getState());
     }
   });
@@ -326,54 +272,38 @@ function registerIpc() {
   handle('targets:getMonthly', (_e, month) => db.getMonthlyTargetMinutes(month));
   handle('targets:setMonthlyOverride', (_e, month, minutes) => db.setMonthlyTargetOverride(month, minutes));
 
+  handle('day:getFirstStart', (_e, date) => db.getDayFirstStartedAt(date));
+
   handle('timer:getState', () => timer.getState());
   handle('timer:start', (_e, projectId) => {
     timer.start(projectId);
+    attention.notifyManualStart();
     broadcast('timer:update', timer.getState());
   });
   handle('timer:pause', () => {
     timer.pause();
+    attention.notifyManualPause();
     broadcast('timer:update', timer.getState());
   });
   handle('timer:resume', () => {
     timer.resume();
+    attention.notifyManualResume();
     broadcast('timer:update', timer.getState());
   });
   handle('timer:switch', (_e, projectId) => {
+    const wasIdle = timer.getState().status === 'idle';
     timer.switchProject(projectId);
+    attention.notifySwitch(wasIdle);
     broadcast('timer:update', timer.getState());
   });
   handle('timer:snoozeBreak', (_e, remindInMinutes?: number) => {
-    if (typeof remindInMinutes === 'number') timer.snoozeBreakFor(remindInMinutes);
-    else timer.resetBreakClock();
+    attention.snoozeBreak(remindInMinutes);
   });
-  handle('timer:resolveIdle', (_e, discard: boolean, projectId: number, idleSeconds: number) => {
-    if (!idlePromptOpen) return; // already resolved from the other window
-    idlePromptOpen = false;
-    if (discard) {
-      // Remove the whole idle window (the timer kept running through it), then continue timing.
-      const seconds = idlePromptStartedAt !== null ? (Date.now() - idlePromptStartedAt) / 1000 : idleSeconds;
-      timer.pause();
-      timer.discardSeconds(projectId, seconds);
-      timer.resume();
-    }
-    // On keep, the timer never paused, so there's nothing to do — it's still running.
-    idlePromptStartedAt = null;
-    broadcast('timer:update', timer.getState());
-    broadcast('idle:resolved');
+  handle('timer:resolveIdle', (_e, discard: boolean) => {
+    attention.resolveIdle(discard);
   });
   handle('timer:resolveResume', (_e, discard: boolean) => {
-    if (!resumePromptOpen) return; // already resolved from the other window
-    resumePromptOpen = false;
-    if (discard && resumePromptStartedAt !== null) {
-      const projectId = timer.getState().activeProjectId;
-      const seconds = (Date.now() - resumePromptStartedAt) / 1000;
-      timer.pause();
-      if (projectId !== null) timer.discardSeconds(projectId, seconds);
-    }
-    resumePromptStartedAt = null;
-    broadcast('timer:update', timer.getState());
-    broadcast('resume:resolved');
+    attention.resolveResume(discard);
   });
 
   handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
@@ -491,16 +421,33 @@ app.whenReady().then(() => {
 
   timer = new TimerEngine({
     onUpdate: (state) => broadcast('timer:update', state),
-    onBreakPrompt: (minutesWorked) => broadcast('break:prompt', minutesWorked),
   });
+
+  attention = new AttentionMonitor(
+    timer,
+    {
+      onIdlePrompt: (payload) => {
+        showOverlayForPrompt();
+        broadcast('idle:prompt', payload);
+      },
+      onIdleResolved: () => broadcast('idle:resolved'),
+      onResumePrompt: (payload) => {
+        showOverlayForPrompt();
+        broadcast('resume:prompt', payload);
+      },
+      onResumeResolved: () => broadcast('resume:resolved'),
+      onBreakPrompt: (minutesWorked) => broadcast('break:prompt', minutesWorked),
+      onBreakDismissed: () => broadcast('break:dismissed'),
+      onStateChange: () => broadcast('timer:update', timer.getState()),
+    },
+    { getSettings: () => db.getSettings(), powerMonitor }
+  );
 
   registerIpc();
   createMainWindow();
   createOverlayWindow();
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
-  startIdleMonitor();
-  startResumeMonitor();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

@@ -4,7 +4,13 @@ export function useBreakPrompt() {
   const [minutesWorked, setMinutesWorked] = useState<number | null>(null);
 
   useEffect(() => {
-    return window.api.timer.onBreakPrompt((minutes) => setMinutesWorked(minutes));
+    const offPrompt = window.api.timer.onBreakPrompt((minutes) => setMinutesWorked(minutes));
+    // A higher-priority idle/resume prompt dismissed this one — close it (it re-arms on the backend).
+    const offDismissed = window.api.timer.onBreakDismissed(() => setMinutesWorked(null));
+    return () => {
+      offPrompt();
+      offDismissed();
+    };
   }, []);
 
   const snooze = useCallback(() => {

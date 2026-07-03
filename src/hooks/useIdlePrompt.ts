@@ -4,14 +4,16 @@ import { useNowTick } from './useNowTick';
 interface IdleInfo {
   projectId: number;
   idleSeconds: number;
+  frozen: boolean; // true = a fixed, already-elapsed amount; false = still live/growing
 }
 
-// Prompts (from the main process) when a running timer has been idle past the threshold. The timer
-// keeps running, so this clock shows the real, still-growing idle time. Keep it (a meeting) or discard
-// the whole idle window (you walked away) — either way timing continues.
+// Prompts (from the main process) when a running timer has been idle past the threshold. Two
+// shapes share this channel: a *live* prompt (frozen: false) while the timer is still running and
+// the clock keeps growing until answered; and a *frozen* prompt (frozen: true) shown only once the
+// user has actually returned from an escalated away-period, showing the fixed banked amount.
 export function useIdlePrompt() {
   const [idle, setIdle] = useState<IdleInfo | null>(null);
-  const idleStartedAt = useRef(0); // epoch ms the idle window began
+  const idleStartedAt = useRef(0); // epoch ms the idle window began (live case only)
   const now = useNowTick(1000);
 
   useEffect(() => {
@@ -26,10 +28,10 @@ export function useIdlePrompt() {
     };
   }, []);
 
-  const liveIdleSeconds = idle ? (now - idleStartedAt.current) / 1000 : 0;
+  const liveIdleSeconds = idle ? (idle.frozen ? idle.idleSeconds : (now - idleStartedAt.current) / 1000) : 0;
 
   const resolve = (discard: boolean) => {
-    if (idle) window.api.timer.resolveIdle(discard, idle.projectId, idle.idleSeconds, true);
+    if (idle) window.api.timer.resolveIdle(discard);
     setIdle(null);
   };
 

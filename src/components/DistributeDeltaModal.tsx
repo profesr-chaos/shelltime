@@ -3,7 +3,7 @@ import type { Project, DailyEntry } from '@shared/types';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { ColorDot } from './ui/Badge';
-import { minutesToHhMm, signedHoursLabel } from '@/lib/format';
+import { minutesToHhMm, signedMinutesToHhMm } from '@/lib/format';
 import { useToast } from './ui/Toast';
 
 interface DistributeDeltaModalProps {
@@ -63,7 +63,7 @@ export function DistributeDeltaModal({ date, projects, deltaMinutes, onClose, on
       <div className="mb-4 rounded-xl bg-slate-50 py-3 text-center">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delta</p>
         <p className={`mt-1 text-lg font-bold ${isIncrease ? 'text-emerald-600' : 'text-red-500'}`}>
-          {signedHoursLabel(deltaMinutes)}
+          {signedMinutesToHhMm(deltaMinutes)}
         </p>
       </div>
 

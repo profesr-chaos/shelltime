@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { DailyEntry, DailyTargetStatus, Note, Project } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useTimer } from '@/hooks/useTimer';
-import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms } from '@/lib/format';
+import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms, formatClockTime, signedMinutesToHhMm } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { IconButton } from '@/components/ui/Button';
@@ -28,6 +28,7 @@ export function Today() {
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [target, setTarget] = useState<DailyTargetStatus | null>(null);
   const [yesterdayMinutes, setYesterdayMinutes] = useState(0);
+  const [firstStartedAt, setFirstStartedAt] = useState<string | null>(null);
   const [notesByProject, setNotesByProject] = useState<Map<number, number>>(new Map());
   const [editEntry, setEditEntry] = useState<DailyEntry | 'new' | null>(null);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
@@ -38,6 +39,7 @@ export function Today() {
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
     window.api.targets.getDailyStatus(date).then(setTarget);
+    window.api.day.getFirstStart(date).then(setFirstStartedAt);
     window.api.notes.list(date).then((notes: Note[]) => {
       const map = new Map<number, number>();
       for (const n of notes) map.set(n.projectId, (map.get(n.projectId) ?? 0) + 1);
@@ -86,14 +88,27 @@ export function Today() {
   const weekday = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
   const monthDay = formatMonthDay(date);
 
-  const handleSeek = (newFraction: number) => {
-    // Lock the dropped total to the nearest 5 minutes.
+  // Lock the dropped total to the nearest 5 minutes — shared by the drag-label preview and the
+  // actual seek handler so the label always matches what releasing there will produce.
+  const snappedDeltaMinutes = (newFraction: number): number => {
     const snappedTracked = Math.round((newFraction * targetMinutes) / 5) * 5;
-    const delta = Math.round(snappedTracked - trackedMinutes);
+    return Math.round(snappedTracked - trackedMinutes);
+  };
+
+  const handleSeek = (newFraction: number) => {
+    const delta = snappedDeltaMinutes(newFraction);
     if (delta === 0) return;
+    const snappedTracked = Math.round((newFraction * targetMinutes) / 5) * 5;
     setSeekPreview(targetMinutes > 0 ? snappedTracked / targetMinutes : newFraction);
     setDistributeDelta(delta);
   };
+
+  const dragLabel = (fraction: number) => signedMinutesToHhMm(snappedDeltaMinutes(fraction));
+
+  const startLabel = firstStartedAt ? formatClockTime(firstStartedAt) : '--:--';
+  const endLabel = firstStartedAt
+    ? formatClockTime(new Date(new Date(firstStartedAt).getTime() + targetMinutes * 60_000))
+    : '--:--';
 
   return (
     <div>
@@ -140,7 +155,16 @@ export function Today() {
           </span>
         </div>
         <div title="Drag the snail to reassign tracked time between projects">
-          <ProgressBar fraction={pct} tone="amber" paused={timerState.status === 'paused'} onSeek={handleSeek} previewFraction={seekPreview} />
+          <ProgressBar
+            fraction={pct}
+            tone="amber"
+            paused={timerState.status === 'paused'}
+            onSeek={handleSeek}
+            previewFraction={seekPreview}
+            startLabel={startLabel}
+            endLabel={endLabel}
+            dragLabel={dragLabel}
+          />
         </div>
       </div>
 

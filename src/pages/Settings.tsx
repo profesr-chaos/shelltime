@@ -21,7 +21,7 @@ export function Settings() {
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [dataPath, setDataPath] = useState('');
   const [monthlyOverrideEnabled, setMonthlyOverrideEnabled] = useState(false);
-  const [monthlyOverrideHours, setMonthlyOverrideHours] = useState('40');
+  const [monthlyOverrideMinutes, setMonthlyOverrideMinutes] = useState(40 * 60);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
   const [states, setStates] = useState<{ code: string; name: string }[]>([]);
   const toast = useToast();
@@ -47,7 +47,7 @@ export function Settings() {
   useEffect(() => {
     window.api.settings.get().then(setSettings);
     window.api.app.getDataPath().then(setDataPath);
-    window.api.targets.getMonthly(month).then((minutes) => setMonthlyOverrideHours((minutes / 60).toFixed(1)));
+    window.api.targets.getMonthly(month).then(setMonthlyOverrideMinutes);
   }, [month]);
 
   useEffect(() => {
@@ -166,18 +166,11 @@ export function Settings() {
           />
           {monthlyOverrideEnabled && (
             <div className="mt-2 flex items-center gap-2">
-              <TextInput
-                type="number"
-                step="0.5"
-                value={monthlyOverrideHours}
-                onChange={(e) => setMonthlyOverrideHours(e.target.value)}
-                className="w-28"
-              />
-              <span className="text-sm text-slate-500">hours</span>
+              <DurationInput minutes={monthlyOverrideMinutes} onChange={setMonthlyOverrideMinutes} maxMinutes={999 * 60} />
               <Button
                 variant="secondary"
                 onClick={async () => {
-                  await window.api.targets.setMonthlyOverride(month, parseFloat(monthlyOverrideHours) * 60);
+                  await window.api.targets.setMonthlyOverride(month, monthlyOverrideMinutes);
                   toast('Monthly target overridden');
                 }}
               >
@@ -202,10 +195,10 @@ export function Settings() {
           onChange={(v) => update({ grindMode: v })}
           label={settings.grindMode ? 'Grind mode is ON - break reminders are suppressed' : 'Grind mode'}
         />
-        <FieldWrap label="Ask about idle time after" tooltip="After this much inactivity, the timer keeps running but asks whether to keep the time (a meeting) or discard it (you walked away). Sleep/lock still pauses immediately. Set to 0 to disable.">
+        <FieldWrap label="Ask about idle time after" tooltip="After this much inactivity, you're asked whether to keep the time (a meeting) or discard it (you walked away). If it's not answered within another interval of this length, the timer pauses automatically and asks when you return instead. Sleep/lock pauses immediately. Set to 0 to disable.">
           <DurationInput
-            minutes={settings.autoPauseIdleMinutes}
-            onChange={(minutes) => update({ autoPauseIdleMinutes: Math.max(0, minutes) })}
+            minutes={settings.idlePromptMinutes}
+            onChange={(minutes) => update({ idlePromptMinutes: Math.max(0, minutes) })}
             minMinutes={0}
             maxMinutes={2 * 60}
           />

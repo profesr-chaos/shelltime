@@ -9,9 +9,22 @@ interface ProgressBarProps {
   paused?: boolean;
   onSeek?: (fraction: number) => void; // provide to make the snail draggable
   previewFraction?: number | null; // hold the snail here (e.g. while a follow-up modal is open)
+  startLabel?: string; // shown under the left edge (e.g. when work started today)
+  endLabel?: string; // shown under the right edge (e.g. start + target hours)
+  dragLabel?: (fraction: number) => string; // computes the label shown below the snail while dragging (e.g. "+0:35")
 }
 
-export function ProgressBar({ fraction, tone = 'amber', showSnail = true, paused = false, onSeek, previewFraction }: ProgressBarProps) {
+export function ProgressBar({
+  fraction,
+  tone = 'amber',
+  showSnail = true,
+  paused = false,
+  onSeek,
+  previewFraction,
+  startLabel,
+  endLabel,
+  dragLabel,
+}: ProgressBarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [dragFraction, setDragFraction] = useState<number | null>(null);
@@ -68,7 +81,21 @@ export function ProgressBar({ fraction, tone = 'amber', showSnail = true, paused
             style={{ left: `${pct}%` }}
           />
         )}
+        {dragging && dragLabel && dragFraction !== null && (
+          <span
+            className="pointer-events-none absolute top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-1.5 py-0.5 text-xs font-semibold text-white"
+            style={{ left: `${Math.max(8, Math.min(92, pct))}%` }}
+          >
+            {dragLabel(dragFraction)}
+          </span>
+        )}
       </div>
+      {(startLabel !== undefined || endLabel !== undefined) && (
+        <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+          <span>{startLabel ?? ''}</span>
+          <span>{endLabel ?? ''}</span>
+        </div>
+      )}
     </div>
   );
 }

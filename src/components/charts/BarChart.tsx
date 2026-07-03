@@ -1,4 +1,5 @@
 import type { MonthlyDailyTotal } from '@shared/types';
+import { minutesToHhMm } from '@/lib/format';
 
 interface BarChartProps {
   data: MonthlyDailyTotal[];
@@ -19,7 +20,7 @@ export function BarChart({ data, targetMinutes, onBarClick }: BarChartProps) {
           className="absolute inset-x-0 border-t border-dashed border-slate-300"
           style={{ bottom: `${targetLineFromBottom}%` }}
         >
-          <span className="absolute -top-4 left-0 text-[10px] text-slate-400">{(targetMinutes / 60).toFixed(0)}h target</span>
+          <span className="absolute -top-4 left-0 text-[10px] text-slate-400">{minutesToHhMm(targetMinutes)} target</span>
         </div>
       )}
       <div className="flex h-full items-end gap-1.5">
@@ -32,7 +33,7 @@ export function BarChart({ data, targetMinutes, onBarClick }: BarChartProps) {
               key={d.date}
               disabled={!clickable}
               onClick={() => clickable && onBarClick?.(d.date)}
-              title={`${d.date}: ${(d.minutes / 60).toFixed(1)}h`}
+              title={`${d.date}: ${minutesToHhMm(d.minutes)}`}
               className={`group flex-1 rounded-t transition-opacity ${isUnder ? 'bg-red-400' : 'bg-amber'} ${
                 clickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
               }`}

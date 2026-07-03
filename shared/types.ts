@@ -56,7 +56,7 @@ export interface LeaveSummary {
 export interface Settings {
   defaultDailyTargetMinutes: number;
   breakIntervalMinutes: number;
-  autoPauseIdleMinutes: number; // pause a running timer after this many idle minutes; 0 disables
+  idlePromptMinutes: number; // ask about idle time after this many idle minutes; 0 disables
   idleResumeMode: 'off' | 'auto' | 'prompt'; // when paused and activity returns: do nothing / resume silently / prompt keep-or-discard
   grindMode: boolean;
   overlayAlwaysOnTop: boolean;

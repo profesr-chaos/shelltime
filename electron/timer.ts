@@ -7,9 +7,6 @@ function todayStr(): string {
 }
 
 const FLUSH_INTERVAL_MS = 15_000;
-// A brief pause or a project switch is still continuous work — only a pause longer than this
-// resets the break clock.
-const BREAK_PAUSE_RESET_MS = 5 * 60 * 1000;
 
 export class TimerEngine {
   private status: 'idle' | 'running' | 'paused' = 'idle';
@@ -17,18 +14,12 @@ export class TimerEngine {
   private sessionStartedAt: number | null = null;
   private accumulatedSecondsToday = 0;
   private currentDate = todayStr();
-  private continuousWorkSeconds = 0;
-  private pausedAt: number | null = null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
-  private breakTimer: ReturnType<typeof setInterval> | null = null;
   private onUpdate: (state: TimerState) => void;
-  private onBreakPrompt: (minutesWorked: number) => void;
 
-  constructor(opts: { onUpdate: (state: TimerState) => void; onBreakPrompt: (minutesWorked: number) => void }) {
+  constructor(opts: { onUpdate: (state: TimerState) => void }) {
     this.onUpdate = opts.onUpdate;
-    this.onBreakPrompt = opts.onBreakPrompt;
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
-    this.breakTimer = setInterval(() => this.tickBreakClock(), 1000);
   }
 
   private rolloverDayIfNeeded() {
@@ -87,34 +78,6 @@ export class TimerEngine {
     }
   }
 
-  private tickBreakClock() {
-    if (this.status === 'running') {
-      this.continuousWorkSeconds += 1;
-      const settings = db.getSettings();
-      if (!settings.grindMode && this.continuousWorkSeconds >= settings.breakIntervalMinutes * 60) {
-        this.onBreakPrompt(Math.round(this.continuousWorkSeconds / 60));
-      }
-    }
-  }
-
-  resetBreakClock() {
-    this.continuousWorkSeconds = 0;
-  }
-
-  // On resuming/switching, only reset the break clock if the timer sat paused longer than the threshold.
-  private maybeResetBreakOnResume() {
-    if (this.pausedAt !== null && Date.now() - this.pausedAt > BREAK_PAUSE_RESET_MS) {
-      this.resetBreakClock();
-    }
-    this.pausedAt = null;
-  }
-
-  /** Dismiss the break prompt but re-prompt after `minutes` of continued work, not the full interval. */
-  snoozeBreakFor(minutes: number) {
-    const threshold = db.getSettings().breakIntervalMinutes * 60;
-    this.continuousWorkSeconds = Math.max(0, threshold - minutes * 60);
-  }
-
   /** Remove idle seconds that were banked to a project (e.g. the user was away, not in a meeting). */
   discardSeconds(projectId: number, seconds: number) {
     db.addTimeToProject(this.currentDate, projectId, -seconds / 60, 'timer');
@@ -145,11 +108,11 @@ export class TimerEngine {
   start(projectId: number) {
     if (!db.getProject(projectId)) return;
     this.rolloverDayIfNeeded();
+    db.recordDayFirstStartIfNeeded(this.currentDate);
     this.activeProjectId = projectId;
     this.status = 'running';
     this.sessionStartedAt = Date.now();
     this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
-    this.resetBreakClock();
     this.emit();
   }
 
@@ -158,7 +121,6 @@ export class TimerEngine {
     this.flush();
     this.status = 'paused';
     this.sessionStartedAt = null;
-    this.pausedAt = Date.now();
     this.emit();
   }
 
@@ -167,7 +129,6 @@ export class TimerEngine {
     this.rolloverDayIfNeeded();
     this.status = 'running';
     this.sessionStartedAt = Date.now();
-    this.maybeResetBreakOnResume();
     this.emit();
   }
 
@@ -182,21 +143,17 @@ export class TimerEngine {
 
   switchProject(projectId: number) {
     if (!db.getProject(projectId)) return;
-    const wasIdle = this.status === 'idle';
     if (this.status === 'running') this.flush();
     this.rolloverDayIfNeeded();
+    db.recordDayFirstStartIfNeeded(this.currentDate);
     this.activeProjectId = projectId;
     this.status = 'running';
     this.sessionStartedAt = Date.now();
     this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
-    // Switching projects is continuous work — keep the break clock unless starting fresh or after a long pause.
-    if (wasIdle) this.resetBreakClock();
-    else this.maybeResetBreakOnResume();
     this.emit();
   }
 
   dispose() {
     if (this.flushTimer) clearInterval(this.flushTimer);
-    if (this.breakTimer) clearInterval(this.breakTimer);
   }
 }

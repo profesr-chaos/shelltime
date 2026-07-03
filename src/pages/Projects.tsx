@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Project, ProjectHistory } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
-import { currentMonthStr, minutesToHoursLabel, formatDateShort, formatMonth } from '@/lib/format';
+import { currentMonthStr, minutesToHhMm, formatDateShort, formatMonth } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
 import { TextInput, Select } from '@/components/ui/Inputs';
@@ -128,7 +128,7 @@ function ProjectRow({ project, hours, comments, onEdit }: { project: Project; ho
         </button>
         <button onClick={onEdit} className="text-left font-semibold text-slate-900">{project.name}</button>
         <span className="text-right font-medium text-slate-700">{comments}</span>
-        <span className="text-right font-medium text-slate-700">{minutesToHoursLabel(hours)}</span>
+        <span className="text-right font-medium text-slate-700">{minutesToHhMm(hours)}</span>
       </div>
 
       {open && (
