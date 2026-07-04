@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { MonthlySummary } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
+import { useTimer } from '@/hooks/useTimer';
 import { currentMonthStr, shiftMonth, formatMonth, minutesToHhMm, signedMinutesToHhMm, formatDateShort } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { BarChart } from '@/components/charts/BarChart';
 import { EditTimingsModal } from '@/components/EditTimingsModal';
 import { LeaveCard } from '@/components/LeaveCard';
+import { FinishedForToday } from '@/components/FinishedForToday';
 
 interface DashboardProps {
   onOpenExport?: (month: string) => void;
@@ -20,6 +22,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
   const [month, setMonth] = useState(currentMonthStr());
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const { projects } = useProjects();
+  const { state, stop, start } = useTimer();
   const [editDate, setEditDate] = useState<string | null>(null);
 
   const load = () => window.api.dashboard.getMonthlySummary(month).then(setSummary);
@@ -53,7 +56,13 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
             <ChevronRightIcon />
           </button>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-4">
+          <FinishedForToday
+            finished={state.status === 'idle'}
+            projects={projects}
+            onStop={stop}
+            onResume={start}
+          />
           <Button variant="secondary" onClick={() => onOpenExport?.(month)}>Export</Button>
           <Button variant="secondary" onClick={onOpenSettings}>Settings</Button>
         </div>

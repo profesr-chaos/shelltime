@@ -12,6 +12,7 @@ import { ManualTimeModal } from '@/components/ManualTimeModal';
 import { AddEditProjectModal } from '@/components/AddEditProjectModal';
 import { DistributeDeltaModal } from '@/components/DistributeDeltaModal';
 import { NotesModal } from '@/components/NotesModal';
+import { FinishedForToday } from '@/components/FinishedForToday';
 
 const shiftDay = (date: string, delta: number): string => {
   const d = new Date(date + 'T00:00:00');
@@ -23,7 +24,7 @@ export function Today() {
   const [date, setDate] = useState(todayIso());
   const isToday = date === todayIso();
   const { projects, refresh: refreshProjects } = useProjects(false);
-  const { state: timerState, liveActiveSeconds, start, switchProject } = useTimer();
+  const { state: timerState, liveActiveSeconds, start, switchProject, stop } = useTimer();
 
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [target, setTarget] = useState<DailyTargetStatus | null>(null);
@@ -137,6 +138,14 @@ export function Today() {
             {weekday} · Workday {workdayNumberOfYear(date)} of {new Date(date).getFullYear()}
           </p>
         </div>
+        {isToday && (
+          <FinishedForToday
+            finished={timerState.status === 'idle'}
+            projects={projects}
+            onStop={stop}
+            onResume={(id) => (timerState.activeProjectId === null ? start(id) : switchProject(id))}
+          />
+        )}
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-4">

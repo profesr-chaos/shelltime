@@ -82,6 +82,7 @@ const api = {
     start: (projectId: number): Promise<void> => ipcRenderer.invoke('timer:start', projectId),
     pause: (): Promise<void> => ipcRenderer.invoke('timer:pause'),
     resume: (): Promise<void> => ipcRenderer.invoke('timer:resume'),
+    stop: (): Promise<void> => ipcRenderer.invoke('timer:stop'),
     switchProject: (projectId: number): Promise<void> => ipcRenderer.invoke('timer:switch', projectId),
     onUpdate: (cb: (state: TimerState) => void) => {
       const listener = (_: unknown, state: TimerState) => cb(state);

@@ -290,6 +290,11 @@ function registerIpc() {
     attention.notifyManualResume();
     broadcast('timer:update', timer.getState());
   });
+  handle('timer:stop', () => {
+    timer.stop();
+    attention.notifyStop();
+    broadcast('timer:update', timer.getState());
+  });
   handle('timer:switch', (_e, projectId) => {
     const wasIdle = timer.getState().status === 'idle';
     timer.switchProject(projectId);

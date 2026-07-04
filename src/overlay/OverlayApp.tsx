@@ -10,10 +10,11 @@ import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
 import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon, SunIcon, MoonIcon } from '@/components/icons';
 import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
+import { FinishedForToday } from '@/components/FinishedForToday';
 import { OverlayNoteView } from './OverlayNoteView';
 
 export function OverlayApp() {
-  const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, switchProject, start } = useTimer();
+  const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, stop, switchProject, start } = useTimer();
   const { projects } = useProjects();
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
   const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
@@ -100,9 +101,10 @@ export function OverlayApp() {
   const onResume = resumePrompt.projectId !== null;
 
   useEffect(() => {
-    if (idle || onResume) window.api.overlay.setHeight(210);
+    if (onResume) window.api.overlay.setHeight(250);
+    else if (idle) window.api.overlay.setHeight(210);
     else if (onBreak) window.api.overlay.setHeight(390);
-    else window.api.overlay.setHeight(compact ? 32 : 220);
+    else window.api.overlay.setHeight(compact ? 32 : 240);
   }, [idle, onResume, onBreak, compact]);
 
   if (onResume) {
@@ -127,6 +129,18 @@ export function OverlayApp() {
           >
             Not yet
           </button>
+        </div>
+        <div className="mt-3 flex justify-center">
+          <FinishedForToday
+            finished={false}
+            projects={projects}
+            onStop={() => {
+              resumePrompt.reject();
+              stop();
+            }}
+            onResume={start}
+            bordered={false}
+          />
         </div>
       </div>
     );
@@ -289,6 +303,16 @@ export function OverlayApp() {
             <NoteIcon width={16} height={16} />
           </IconButton>
         </div>
+        <FinishedForToday
+          finished={state.status === 'idle'}
+          projects={projects}
+          onStop={stop}
+          onResume={start}
+          disabled={onBreak}
+          bordered={false}
+          menuAnchorClassName="bottom-10 left-0"
+          className="mt-3"
+        />
       </div>
 
       {onBreak && (

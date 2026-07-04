@@ -132,6 +132,17 @@ export class TimerEngine {
     this.emit();
   }
 
+  /** End the work session entirely (not just a pause) — no active project, so idle/resume/break
+   * monitoring has nothing to nag about. Starting a new project is how the user "un-stops". */
+  stop() {
+    if (this.status === 'idle') return;
+    this.flush();
+    this.status = 'idle';
+    this.activeProjectId = null;
+    this.sessionStartedAt = null;
+    this.emit();
+  }
+
   stopIfActiveProjectMissing() {
     if (this.activeProjectId !== null && !db.getProject(this.activeProjectId)) {
       this.status = 'idle';
