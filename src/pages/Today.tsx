@@ -140,7 +140,7 @@ export function Today() {
         </div>
         {isToday && (
           <FinishedForToday
-            finished={timerState.status === 'idle'}
+            finished={timerState.finishedForToday}
             projects={projects}
             onStop={stop}
             onResume={(id) => (timerState.activeProjectId === null ? start(id) : switchProject(id))}

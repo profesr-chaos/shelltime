@@ -8,6 +8,7 @@ const EMPTY_STATE: TimerState = {
   sessionStartedAt: null,
   accumulatedSecondsToday: 0,
   todayTotalSeconds: 0,
+  finishedForToday: false,
 };
 
 export function useTimer() {

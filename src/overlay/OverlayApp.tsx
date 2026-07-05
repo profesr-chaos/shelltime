@@ -12,7 +12,6 @@ import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, Ex
 import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
 import { FinishedForToday } from '@/components/FinishedForToday';
 import { OverlayNoteView } from './OverlayNoteView';
-
 export function OverlayApp() {
   const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, stop, switchProject, start } = useTimer();
   const { projects } = useProjects();
@@ -282,12 +281,13 @@ export function OverlayApp() {
           className="no-drag flex w-full items-center justify-center gap-2 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-default disabled:opacity-50"
         >
           {state.status === 'running' ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-          {state.status === 'running' ? 'Pause' : 'Resume'}
+          
         </button>
         <div className="mt-2 flex gap-2">
           <div className="relative flex-1">
             <IconButton label="Switch project" disabled={onBreak} className="no-drag w-full" onClick={() => setSwitchOpen((v) => !v)}>
               <SwitchIcon width={16} height={16} />
+              
             </IconButton>
             {switchOpen && (
               <QuickSwitchMenu
@@ -304,7 +304,7 @@ export function OverlayApp() {
           </IconButton>
         </div>
         <FinishedForToday
-          finished={state.status === 'idle'}
+          finished={state.finishedForToday}
           projects={projects}
           onStop={stop}
           onResume={start}

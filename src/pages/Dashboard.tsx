@@ -58,7 +58,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
         </div>
         <div className="flex items-center gap-4">
           <FinishedForToday
-            finished={state.status === 'idle'}
+            finished={state.finishedForToday}
             projects={projects}
             onStop={stop}
             onResume={start}

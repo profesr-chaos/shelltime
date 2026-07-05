@@ -83,6 +83,7 @@ export interface TimerState {
   sessionStartedAt: number | null; // epoch ms, present only while running
   accumulatedSecondsToday: number; // already-committed seconds for active project today
   todayTotalSeconds: number; // sum across all projects today (committed)
+  finishedForToday: boolean; // user clicked "Finished for today"; auto-clears when the next working day starts
 }
 
 export interface BreakPromptPayload {

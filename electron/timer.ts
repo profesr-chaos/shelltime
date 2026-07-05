@@ -14,20 +14,38 @@ export class TimerEngine {
   private sessionStartedAt: number | null = null;
   private accumulatedSecondsToday = 0;
   private currentDate = todayStr();
+  private finishedOn: string | null = db.getFinishedOn();
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private onUpdate: (state: TimerState) => void;
 
   constructor(opts: { onUpdate: (state: TimerState) => void }) {
     this.onUpdate = opts.onUpdate;
+    this.clearFinishedIfNewWorkday(); // drop a stale "finished" left over from a previous work day
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
+  }
+
+  private setFinishedOn(date: string | null) {
+    if (this.finishedOn === date) return;
+    this.finishedOn = date;
+    db.setFinishedOn(date);
+  }
+
+  // "Finished for today" survives non-working days (weekend, bank holidays, per workingDays
+  // settings) but clears as soon as a working day arrives, so Monday starts unchecked.
+  private clearFinishedIfNewWorkday() {
+    if (this.finishedOn !== null && this.finishedOn !== this.currentDate && db.isWorkingDay(this.currentDate)) {
+      this.setFinishedOn(null);
+    }
   }
 
   private rolloverDayIfNeeded() {
     const today = todayStr();
     if (today !== this.currentDate) {
-      this.flush();
+      this.commitElapsed(); // bank in-flight seconds to the old date before switching
       this.currentDate = today;
       this.accumulatedSecondsToday = 0;
+      this.clearFinishedIfNewWorkday();
+      this.emit();
     }
   }
 
@@ -59,22 +77,28 @@ export class TimerEngine {
   private flush() {
     try {
       this.rolloverDayIfNeeded();
-      if (this.status === 'running' && this.activeProjectId !== null && this.sessionStartedAt !== null) {
-        if (!db.getProject(this.activeProjectId)) {
-          // The active project was deleted from under the timer (e.g. in another window) — stop cleanly.
-          this.status = 'idle';
-          this.activeProjectId = null;
-          this.sessionStartedAt = null;
-          this.emit();
-          return;
-        }
-        const elapsed = this.liveElapsedSeconds();
-        db.addTimeToProject(this.currentDate, this.activeProjectId, elapsed / 60, 'timer');
-        this.accumulatedSecondsToday += elapsed;
-        this.sessionStartedAt = Date.now();
-      }
+      this.commitElapsed();
     } catch (err) {
       console.error('TimerEngine.flush failed:', err);
+    }
+  }
+
+  // Persist in-flight session seconds to the DB against currentDate. Separate from flush() so the
+  // day rollover can bank against the old date without flush→rollover→flush mutual recursion.
+  private commitElapsed() {
+    if (this.status === 'running' && this.activeProjectId !== null && this.sessionStartedAt !== null) {
+      if (!db.getProject(this.activeProjectId)) {
+        // The active project was deleted from under the timer (e.g. in another window) — stop cleanly.
+        this.status = 'idle';
+        this.activeProjectId = null;
+        this.sessionStartedAt = null;
+        this.emit();
+        return;
+      }
+      const elapsed = this.liveElapsedSeconds();
+      db.addTimeToProject(this.currentDate, this.activeProjectId, elapsed / 60, 'timer');
+      this.accumulatedSecondsToday += elapsed;
+      this.sessionStartedAt = Date.now();
     }
   }
 
@@ -98,6 +122,7 @@ export class TimerEngine {
       sessionStartedAt: this.sessionStartedAt,
       accumulatedSecondsToday: this.accumulatedSecondsToday,
       todayTotalSeconds: this.todayTotalSeconds(),
+      finishedForToday: this.finishedOn !== null,
     };
   }
 
@@ -109,6 +134,7 @@ export class TimerEngine {
     if (!db.getProject(projectId)) return;
     this.rolloverDayIfNeeded();
     db.recordDayFirstStartIfNeeded(this.currentDate);
+    this.setFinishedOn(null);
     this.activeProjectId = projectId;
     this.status = 'running';
     this.sessionStartedAt = Date.now();
@@ -135,11 +161,14 @@ export class TimerEngine {
   /** End the work session entirely (not just a pause) — no active project, so idle/resume/break
    * monitoring has nothing to nag about. Starting a new project is how the user "un-stops". */
   stop() {
-    if (this.status === 'idle') return;
-    this.flush();
-    this.status = 'idle';
-    this.activeProjectId = null;
-    this.sessionStartedAt = null;
+    this.rolloverDayIfNeeded();
+    this.setFinishedOn(this.currentDate);
+    if (this.status !== 'idle') {
+      this.flush();
+      this.status = 'idle';
+      this.activeProjectId = null;
+      this.sessionStartedAt = null;
+    }
     this.emit();
   }
 
@@ -157,6 +186,7 @@ export class TimerEngine {
     if (this.status === 'running') this.flush();
     this.rolloverDayIfNeeded();
     db.recordDayFirstStartIfNeeded(this.currentDate);
+    this.setFinishedOn(null);
     this.activeProjectId = projectId;
     this.status = 'running';
     this.sessionStartedAt = Date.now();

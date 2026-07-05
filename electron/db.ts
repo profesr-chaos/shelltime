@@ -235,6 +235,19 @@ export function updateSettings(patch: Partial<Settings>): Settings {
   return getSettings();
 }
 
+// "Finished for today" marker (YYYY-MM-DD). Lives in the settings kv table but isn't part of the
+// Settings shape — it's timer state that must survive an app restart over a weekend.
+export function getFinishedOn(): string | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'finishedOn'").get() as { value: string } | undefined;
+  return row ? (JSON.parse(row.value) as string | null) : null;
+}
+
+export function setFinishedOn(date: string | null): void {
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES ('finishedOn', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(JSON.stringify(date));
+}
+
 // ---------- projects ----------
 
 function rowToProject(row: any): Project {
