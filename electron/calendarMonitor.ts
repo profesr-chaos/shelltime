@@ -52,13 +52,26 @@ export function computeBusyIntervals(icsText: string, windowStart: number, windo
   return merged;
 }
 
-function fetchIcsOverHttps(url: string): Promise<string> {
+const MAX_REDIRECTS = 5;
+
+function fetchIcsOverHttps(url: string, redirectsLeft = MAX_REDIRECTS): Promise<string> {
   return new Promise((resolve, reject) => {
     https
       .get(url, (res) => {
-        if (res.statusCode && res.statusCode >= 400) {
+        const status = res.statusCode ?? 0;
+        if (status >= 300 && status < 400 && res.headers.location) {
           res.resume();
-          reject(new Error(`ICS fetch failed: HTTP ${res.statusCode}`));
+          if (redirectsLeft <= 0) {
+            reject(new Error('ICS fetch failed: too many redirects'));
+            return;
+          }
+          const next = new URL(res.headers.location, url).toString();
+          resolve(fetchIcsOverHttps(next, redirectsLeft - 1));
+          return;
+        }
+        if (status >= 400) {
+          res.resume();
+          reject(new Error(`ICS fetch failed: HTTP ${status}`));
           return;
         }
         let data = '';
