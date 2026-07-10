@@ -250,7 +250,13 @@ function requestQuit() {
   if (tracked > 0 && !reviewOpen) {
     reviewOpen = true;
     pendingQuit = true;
-    // broadcast (not showOverlayForPrompt) — a hidden window just renders offscreen, it doesn't pop open.
+    // Tray Quit can fire with the main window minimized and the overlay hidden — force the main
+    // window visible so the card actually has somewhere to show (otherwise quitting looks like it
+    // silently did nothing).
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+    }
     broadcast('review:show', buildDayReview(true));
     return;
   }
