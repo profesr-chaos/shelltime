@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { BottomTimerBar } from './components/BottomTimerBar';
 import { IdlePromptModal } from './components/IdlePromptModal';
 import { ResumePromptModal } from './components/ResumePromptModal';
+import { DayReviewModal } from './components/DayReviewModal';
 import { ToastProvider } from './components/ui/Toast';
 import { useProjects } from './hooks/useProjects';
 import { Today } from './pages/Today';
@@ -44,6 +45,7 @@ export default function App() {
       </div>
       <IdlePromptModal />
       <ResumePromptModal />
+      <DayReviewModal />
 
       {exportMonth && <ExportPreview month={exportMonth} onClose={() => setExportMonth(null)} />}
       {needsSetup && !welcomeDismissed && (

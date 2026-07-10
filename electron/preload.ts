@@ -12,6 +12,7 @@ import type {
   LeaveRecord,
   LeaveSummary,
   Session,
+  DayReview,
 } from '../shared/types';
 
 const api = {
@@ -83,6 +84,23 @@ const api = {
     list: (date: string): Promise<Session[]> => ipcRenderer.invoke('sessions:list', date),
     reallocate: (sessionId: number, startIso: string, endIso: string, toProjectId: number): Promise<void> =>
       ipcRenderer.invoke('sessions:reallocate', sessionId, startIso, endIso, toProjectId),
+  },
+  review: {
+    dismiss: (): Promise<void> => ipcRenderer.invoke('review:dismiss'),
+    onShow: (cb: (review: DayReview) => void) => {
+      const listener = (_: unknown, review: DayReview) => cb(review);
+      ipcRenderer.on('review:show', listener);
+      return () => {
+        ipcRenderer.removeListener('review:show', listener);
+      };
+    },
+    onDismissed: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('review:dismissed', listener);
+      return () => {
+        ipcRenderer.removeListener('review:dismissed', listener);
+      };
+    },
   },
   timer: {
     getState: (): Promise<TimerState> => ipcRenderer.invoke('timer:getState'),

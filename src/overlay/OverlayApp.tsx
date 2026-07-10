@@ -4,8 +4,9 @@ import { useProjects } from '@/hooks/useProjects';
 import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { useIdlePrompt } from '@/hooks/useIdlePrompt';
 import { useResumePrompt } from '@/hooks/useResumePrompt';
+import { useDayReview } from '@/hooks/useDayReview';
 import { useOverlayDrag } from '@/hooks/useOverlayDrag';
-import { secondsToHms, minutesToHhMm, todayIso } from '@/lib/format';
+import { secondsToHms, minutesToHhMm, todayIso, signedMinutesToHhMm } from '@/lib/format';
 import { IconButton } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
 import { PauseIcon, PlayIcon, SwitchIcon, NoteIcon, CoffeeIcon, CollapseIcon, ExpandIcon, CloseIcon, SunIcon, MoonIcon } from '@/components/icons';
@@ -18,6 +19,7 @@ export function OverlayApp() {
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
   const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
   const resumePrompt = useResumePrompt();
+  const { review, dismiss: dismissReview } = useDayReview();
   const drag = useOverlayDrag();
 
   const [compact, setCompact] = useState(true);
@@ -100,11 +102,42 @@ export function OverlayApp() {
   const onResume = resumePrompt.projectId !== null;
 
   useEffect(() => {
-    if (onResume) window.api.overlay.setHeight(250);
+    if (review) window.api.overlay.setHeight(300);
+    else if (onResume) window.api.overlay.setHeight(250);
     else if (idle) window.api.overlay.setHeight(210);
     else if (onBreak) window.api.overlay.setHeight(390);
     else window.api.overlay.setHeight(compact ? 32 : 240);
-  }, [idle, onResume, onBreak, compact]);
+  }, [review, idle, onResume, onBreak, compact]);
+
+  if (review) {
+    const delta = review.totalMinutes - review.targetMinutes;
+    return (
+      <div {...drag} className={`${theme} flex h-full w-full select-none flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+        <p className="text-sm font-bold text-slate-900 dark:text-white">Today · {minutesToHhMm(review.totalMinutes)} tracked</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+          {review.targetMinutes > 0 ? `${signedMinutesToHhMm(delta)} vs ${minutesToHhMm(review.targetMinutes)} target` : 'Non-working day'}
+        </p>
+        <div className="mt-2 flex-1 overflow-y-auto">
+          {review.byProject.length === 0 && <p className="text-xs text-slate-400">Nothing tracked today.</p>}
+          {review.byProject.map((p) => (
+            <div key={p.code} className="flex items-center justify-between py-1 text-xs">
+              <span className="flex items-center gap-1.5">
+                <ColorDot color={p.color} />
+                <span className="font-medium text-slate-700 dark:text-slate-200">{p.code}</span>
+              </span>
+              <span className="text-slate-500 dark:text-slate-400">{minutesToHhMm(p.minutes)}</span>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={dismissReview}
+          className="no-drag mt-2 w-full rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
+        >
+          {review.quitting ? 'Quit Shelltime' : 'Close'}
+        </button>
+      </div>
+    );
+  }
 
   if (onResume) {
     const resumeProject = projects.find((p) => p.id === resumePrompt.projectId);

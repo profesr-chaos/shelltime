@@ -101,6 +101,14 @@ export interface BreakPromptPayload {
   minutesWorked: number;
 }
 
+export interface DayReview {
+  date: string;
+  totalMinutes: number;
+  targetMinutes: number; // that day's target (0 on non-working days)
+  byProject: { code: string; name: string; color: string; minutes: number }[]; // desc, leave projects included
+  quitting: boolean; // true when shown as part of the quit flow
+}
+
 export interface DailyTargetStatus {
   date: string;
   targetMinutes: number;

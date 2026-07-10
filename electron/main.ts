@@ -5,6 +5,7 @@ import { TimerEngine } from './timer';
 import { AttentionMonitor } from './attentionMonitor';
 import { listCountries, listStates } from './holidays';
 import { logicalDayStr } from '../shared/logicalDay';
+import type { DayReview } from '../shared/types';
 
 // Wrap every IPC handler so a thrown error is logged in the main process (and still rejects the
 // renderer promise) instead of failing silently and, e.g., leaving a screen blank.
@@ -45,6 +46,8 @@ let overlaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
 // Main's own record of the overlay's intended size — passed explicitly on every setBounds call so
 // a frameless non-resizable window can't drift in size from DPI rounding while being dragged.
 let overlayExpectedSize = { width: 320, height: 220 };
+let reviewOpen = false;
+let pendingQuit = false;
 
 function todayStr(): string {
   return logicalDayStr();
@@ -80,10 +83,12 @@ function createMainWindow() {
   });
 
   // Close = quit (not hide-to-tray) — the tray icon still offers pause/resume/overlay while the
-  // app is running, and "Quit Shelltime" there.
-  mainWindow.on('close', () => {
-    (app as any).isQuitting = true;
-    app.quit();
+  // app is running, and "Quit Shelltime" there. requestQuit() may defer the actual quit to show a
+  // day-review card first; isQuitting is what tells this handler to let a later, real close through.
+  mainWindow.on('close', (e) => {
+    if ((app as any).isQuitting) return;
+    e.preventDefault();
+    requestQuit();
   });
 }
 
@@ -164,10 +169,7 @@ function createTray() {
         { type: 'separator' },
         {
           label: 'Quit Shelltime',
-          click: () => {
-            (app as any).isQuitting = true;
-            app.quit();
-          },
+          click: () => requestQuit(),
         },
       ])
     );
@@ -201,6 +203,47 @@ function exportPrefix(): string {
 
 function showOverlayForPrompt() {
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show();
+}
+
+function buildDayReview(quitting: boolean): DayReview {
+  const date = todayStr();
+  const status = db.getDailyTargetStatus(date);
+  const byProject = db
+    .getDailyEntries(date)
+    .filter((e) => e.durationMinutes > 0)
+    .map((e) => ({ code: e.project.code, name: e.project.name, color: e.project.color, minutes: e.durationMinutes }))
+    .sort((a, b) => b.minutes - a.minutes);
+  return {
+    date,
+    totalMinutes: status.trackedMinutes,
+    targetMinutes: db.isWorkingDay(date) ? status.targetMinutes : 0,
+    byProject,
+    quitting,
+  };
+}
+
+// Dismiss without resolving pendingQuit — used when the user resumes work while a card is open
+// (starting a project again means they're clearly not quitting).
+function closeReviewSilently() {
+  if (!reviewOpen) return;
+  reviewOpen = false;
+  pendingQuit = false;
+  broadcast('review:dismissed');
+}
+
+// Used by both the tray "Quit Shelltime" item and the main window's close (✕) handler.
+function requestQuit() {
+  const tracked = db.getDailyTotalMinutes(todayStr());
+  if (tracked > 0 && !reviewOpen) {
+    reviewOpen = true;
+    pendingQuit = true;
+    // broadcast (not showOverlayForPrompt) — a hidden window just renders offscreen, it doesn't pop open.
+    broadcast('review:show', buildDayReview(true));
+    return;
+  }
+  // Nothing tracked today, or a card is already open (a second ✕/tray-quit while it's showing) — quit now.
+  (app as any).isQuitting = true;
+  app.quit();
 }
 
 function registerIpc() {
@@ -305,6 +348,16 @@ function registerIpc() {
   handle('day:getFirstStart', (_e, date) => db.getDayFirstStartedAt(date));
   handle('day:isWorkingDay', (_e, date: string) => db.isWorkingDay(date));
 
+  handle('review:dismiss', () => {
+    reviewOpen = false;
+    broadcast('review:dismissed');
+    if (pendingQuit) {
+      pendingQuit = false;
+      (app as any).isQuitting = true;
+      app.quit();
+    }
+  });
+
   handle('sessions:list', (_e, date: string) => db.listSessionsForDate(date));
   handle('sessions:reallocate', (_e, sessionId: number, startIso: string, endIso: string, toProjectId: number) => {
     const session = db.getSessionById(sessionId);
@@ -321,6 +374,7 @@ function registerIpc() {
 
   handle('timer:getState', () => timer.getState());
   handle('timer:start', (_e, projectId) => {
+    closeReviewSilently(); // resuming while a card is open counts as dismissing it
     timer.start(projectId);
     attention.notifyManualStart();
     broadcast('timer:update', timer.getState());
@@ -339,8 +393,13 @@ function registerIpc() {
     timer.stop();
     attention.notifyStop();
     broadcast('timer:update', timer.getState());
+    if (!reviewOpen) {
+      reviewOpen = true;
+      broadcast('review:show', buildDayReview(false));
+    }
   });
   handle('timer:switch', (_e, projectId) => {
+    closeReviewSilently(); // resuming while a card is open counts as dismissing it
     const wasIdle = timer.getState().status === 'idle';
     timer.switchProject(projectId);
     attention.notifySwitch(wasIdle);
