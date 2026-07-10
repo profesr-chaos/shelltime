@@ -74,6 +74,11 @@ function createMainWindow() {
   });
   loadWindow(mainWindow, 'index.html');
 
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('Main window renderer process gone:', details.reason);
+    mainWindow?.webContents.reload();
+  });
+
   mainWindow.on('close', (e) => {
     if (!(app as any).isQuitting) {
       e.preventDefault();
@@ -95,6 +100,7 @@ function createOverlayWindow() {
     show: false,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     resizable: false,
     opacity: settings.overlayOpacity,
     alwaysOnTop: settings.overlayAlwaysOnTop,
@@ -109,6 +115,13 @@ function createOverlayWindow() {
   });
   loadWindow(overlayWindow, 'overlay.html');
   if (settings.overlayAlwaysOnTop) overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  // A transparent frameless window shows solid black if its renderer crashes (nothing repaints
+  // it) — reload rather than leaving a dead black widget on screen.
+  overlayWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('Overlay renderer process gone:', details.reason);
+    overlayWindow?.webContents.reload();
+  });
 
   overlayWindow.on('moved', () => {
     if (!overlayWindow) return;
@@ -486,6 +499,15 @@ app.whenReady().then(() => {
   createOverlayWindow();
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
+
+  // Sleep/resume can leave the compositor showing a stale (black) transparent surface — nudge it
+  // to repaint if the overlay is visible.
+  powerMonitor.on('resume', () => {
+    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      overlayWindow.setOpacity(db.getSettings().overlayOpacity);
+      overlayWindow.webContents.invalidate();
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
