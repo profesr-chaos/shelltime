@@ -114,7 +114,9 @@ export class TimerEngine {
   /** Remove idle seconds that were banked to a project (e.g. the user was away, not in a meeting). */
   discardSeconds(projectId: number, seconds: number) {
     db.addTimeToProject(this.currentDate, projectId, -seconds / 60, 'timer');
-    db.trimSessionSeconds(this.currentDate, projectId, seconds);
+    // Never trim the currently-open session — after an escalated-idle pause/resume it's a fresh,
+    // still-running row that just happens to be newest, not part of the banked window being discarded.
+    db.trimSessionSeconds(this.currentDate, projectId, seconds, this.openSessionId);
     if (this.activeProjectId === projectId) {
       this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
       this.emit();

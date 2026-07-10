@@ -826,7 +826,9 @@ export function touchSessionEnd(id: number, endedAt: string): void {
 // Idle discard: trim `seconds` off the tail of the project's sessions for `date`, newest first,
 // deleting rows that shrink to <= 0. ponytail: tail-trim approximates where the idle actually was
 // — it's the right answer in practice because idle windows end at the moment of discard.
-export function trimSessionSeconds(date: string, projectId: number, seconds: number): void {
+// `excludeSessionId` skips the currently-open session (if any) — it's the freshest row and would
+// otherwise be trimmed/deleted first, corrupting the timeline for work that's still in progress.
+export function trimSessionSeconds(date: string, projectId: number, seconds: number, excludeSessionId?: number | null): void {
   let remaining = seconds;
   const rows = db
     .prepare('SELECT id, started_at, ended_at FROM sessions WHERE date = ? AND project_id = ? ORDER BY id DESC')
@@ -835,6 +837,7 @@ export function trimSessionSeconds(date: string, projectId: number, seconds: num
   const shrink = db.prepare('UPDATE sessions SET ended_at = ? WHERE id = ?');
   for (const row of rows) {
     if (remaining <= 0) break;
+    if (row.id === excludeSessionId) continue;
     const durationSec = (new Date(row.ended_at).getTime() - new Date(row.started_at).getTime()) / 1000;
     if (durationSec <= remaining) {
       del.run(row.id);
