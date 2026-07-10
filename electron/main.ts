@@ -4,6 +4,7 @@ import * as db from './db';
 import { TimerEngine } from './timer';
 import { AttentionMonitor } from './attentionMonitor';
 import { listCountries, listStates } from './holidays';
+import { logicalDayStr } from '../shared/logicalDay';
 
 // Wrap every IPC handler so a thrown error is logged in the main process (and still rejects the
 // renderer promise) instead of failing silently and, e.g., leaving a screen blank.
@@ -31,8 +32,7 @@ let attention: AttentionMonitor;
 let overlaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return logicalDayStr();
 }
 
 function loadWindow(win: BrowserWindow, htmlFile: string, extra?: string) {

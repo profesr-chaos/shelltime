@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { minutesToHhMm, signedMinutesToHhMm, secondsToHms, shiftMonth, workdayNumberOfYear } from '../src/lib/format.ts';
 import { isPublicHoliday } from '../electron/holidays.ts';
+import { logicalDayStr } from '../shared/logicalDay.ts';
 
 let passed = 0;
 const t = (name: string, fn: () => void) => {
@@ -50,5 +51,11 @@ t('England Summer bank holiday', () => assert.equal(isPublicHoliday('2026-08-31'
 t('Scotland lacks England Summer bank holiday', () => assert.equal(isPublicHoliday('2026-08-31', 'GB-SCT'), false));
 t('Christmas is a public holiday', () => assert.equal(isPublicHoliday('2026-12-25', 'GB-ENG'), true));
 t('plain weekday is not a holiday', () => assert.equal(isPublicHoliday('2026-07-07', 'GB-ENG'), false));
+
+t('logicalDayStr: the logical day rolls at 04:00, not midnight', () => {
+  assert.equal(logicalDayStr(new Date('2026-07-10T03:59:00')), '2026-07-09');
+  assert.equal(logicalDayStr(new Date('2026-07-10T04:00:00')), '2026-07-10');
+  assert.equal(logicalDayStr(new Date('2026-07-10T00:00:00')), '2026-07-09');
+});
 
 console.log(`ok - ${passed} logic tests passed`);

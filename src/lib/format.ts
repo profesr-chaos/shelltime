@@ -1,3 +1,5 @@
+import { logicalDayStr } from '../../shared/logicalDay.ts';
+
 // h:mm — the one duration format used everywhere in the UI. Minutes are never dropped to a
 // decimal-hour fraction (no "0.9h"); hours don't wrap at 24 (a month can read "168:30").
 export function minutesToHhMm(totalMinutes: number): string {
@@ -35,8 +37,7 @@ export function secondsToHms(totalSeconds: number): string {
 
 
 export function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return logicalDayStr();
 }
 
 export function formatMonth(month: string): string {

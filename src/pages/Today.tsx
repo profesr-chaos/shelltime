@@ -56,6 +56,16 @@ export function Today() {
     load();
   }, [load]);
 
+  // Auto-advance to the new logical day once it starts, but only while viewing "today" — a user
+  // looking at a past day should not get yanked forward.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const nowIso = todayIso();
+      setDate((d) => (d === nowIso ? d : isToday ? nowIso : d));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [isToday]);
+
   useEffect(() => {
     if (timerState.status !== 'idle') load();
   }, [timerState.status, timerState.activeProjectId, load]);
