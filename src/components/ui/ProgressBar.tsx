@@ -10,6 +10,7 @@ interface ProgressBarProps {
   onSeek?: (fraction: number) => void; // provide to make the snail draggable
   previewFraction?: number | null; // hold the snail here (e.g. while a follow-up modal is open)
   dragLabel?: (fraction: number) => string; // computes the label shown below the snail while dragging (e.g. "+0:35")
+  onDragChange?: (fraction: number | null) => void; // fires on every move while dragging, null on release
 }
 
 export function ProgressBar({
@@ -20,6 +21,7 @@ export function ProgressBar({
   onSeek,
   previewFraction,
   dragLabel,
+  onDragChange,
 }: ProgressBarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -37,12 +39,16 @@ export function ProgressBar({
     if (!onSeek) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setDragging(true);
-    setDragFraction(fractionFromPointer(e.clientX));
+    const f = fractionFromPointer(e.clientX);
+    setDragFraction(f);
+    onDragChange?.(f);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
-    setDragFraction(fractionFromPointer(e.clientX));
+    const f = fractionFromPointer(e.clientX);
+    setDragFraction(f);
+    onDragChange?.(f);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -50,6 +56,7 @@ export function ProgressBar({
     const final = fractionFromPointer(e.clientX);
     setDragging(false);
     setDragFraction(null);
+    onDragChange?.(null);
     onSeek?.(final);
   };
 

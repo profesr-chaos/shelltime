@@ -38,6 +38,7 @@ export function Today() {
   const [notesFor, setNotesFor] = useState<{ date: string; project: Project } | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [reassignSession, setReassignSession] = useState<Session | null>(null);
+  const [dragFraction, setDragFraction] = useState<number | null>(null);
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
@@ -118,6 +119,8 @@ export function Today() {
 
   const dragLabel = (fraction: number) => signedMinutesToHhMm(snappedDeltaMinutes(fraction));
 
+  const liveDeltaMinutes = dragFraction !== null ? snappedDeltaMinutes(dragFraction) : null;
+
   return (
     <div>
       <div className="flex items-start justify-between">
@@ -156,9 +159,27 @@ export function Today() {
       </div>
 
       <div className="mt-6 grid grid-cols-3 gap-4">
-        <StatCard label="Tracked" value={minutesToHhMm(trackedMinutes)} delta={trackedDeltaPct !== null ? `${trackedDeltaPct >= 0 ? '+' : ''}${trackedDeltaPct}%` : undefined} deltaTone={trackedDeltaPct !== null && trackedDeltaPct >= 0 ? 'good' : 'bad'} />
+        {liveDeltaMinutes !== null ? (
+          <StatCard
+            label="Tracked"
+            value={minutesToHhMm(trackedMinutes + liveDeltaMinutes)}
+            delta={signedMinutesToHhMm(liveDeltaMinutes)}
+            deltaTone={liveDeltaMinutes >= 0 ? 'good' : 'bad'}
+          />
+        ) : (
+          <StatCard label="Tracked" value={minutesToHhMm(trackedMinutes)} delta={trackedDeltaPct !== null ? `${trackedDeltaPct >= 0 ? '+' : ''}${trackedDeltaPct}%` : undefined} deltaTone={trackedDeltaPct !== null && trackedDeltaPct >= 0 ? 'good' : 'bad'} />
+        )}
         <StatCard label="Daily Target" value={minutesToHhMm(targetMinutes)} />
-        <StatCard label="Remaining" value={minutesToHhMm(remainingMinutes)} delta={remainingDeltaPct !== null ? `${remainingDeltaPct}%` : undefined} deltaTone={remainingMinutes <= 0 ? 'good' : 'bad'} />
+        {liveDeltaMinutes !== null ? (
+          <StatCard
+            label="Remaining"
+            value={minutesToHhMm(Math.max(0, targetMinutes - (trackedMinutes + liveDeltaMinutes)))}
+            delta={signedMinutesToHhMm(-liveDeltaMinutes)}
+            deltaTone={-liveDeltaMinutes >= 0 ? 'good' : 'bad'}
+          />
+        ) : (
+          <StatCard label="Remaining" value={minutesToHhMm(remainingMinutes)} delta={remainingDeltaPct !== null ? `${remainingDeltaPct}%` : undefined} deltaTone={remainingMinutes <= 0 ? 'good' : 'bad'} />
+        )}
       </div>
 
       <div className="mt-8 w-full">
@@ -178,6 +199,7 @@ export function Today() {
             onSeek={handleSeek}
             previewFraction={seekPreview}
             dragLabel={dragLabel}
+            onDragChange={setDragFraction}
           />
         </div>
       </div>
