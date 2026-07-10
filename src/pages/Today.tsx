@@ -30,7 +30,6 @@ export function Today() {
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [target, setTarget] = useState<DailyTargetStatus | null>(null);
   const [yesterdayMinutes, setYesterdayMinutes] = useState(0);
-  const [firstStartedAt, setFirstStartedAt] = useState<string | null>(null);
   const [notesByProject, setNotesByProject] = useState<Map<number, number>>(new Map());
   const [editEntry, setEditEntry] = useState<DailyEntry | 'new' | null>(null);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
@@ -43,7 +42,6 @@ export function Today() {
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
     window.api.targets.getDailyStatus(date).then(setTarget);
-    window.api.day.getFirstStart(date).then(setFirstStartedAt);
     window.api.notes.list(date).then((notes: Note[]) => {
       const map = new Map<number, number>();
       for (const n of notes) map.set(n.projectId, (map.get(n.projectId) ?? 0) + 1);
@@ -120,11 +118,6 @@ export function Today() {
 
   const dragLabel = (fraction: number) => signedMinutesToHhMm(snappedDeltaMinutes(fraction));
 
-  const startLabel = firstStartedAt ? formatClockTime(firstStartedAt) : '--:--';
-  const endLabel = firstStartedAt
-    ? formatClockTime(new Date(new Date(firstStartedAt).getTime() + targetMinutes * 60_000))
-    : '--:--';
-
   return (
     <div>
       <div className="flex items-start justify-between">
@@ -184,8 +177,6 @@ export function Today() {
             paused={timerState.status === 'paused'}
             onSeek={handleSeek}
             previewFraction={seekPreview}
-            startLabel={startLabel}
-            endLabel={endLabel}
             dragLabel={dragLabel}
           />
         </div>

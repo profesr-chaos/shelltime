@@ -9,8 +9,6 @@ interface ProgressBarProps {
   paused?: boolean;
   onSeek?: (fraction: number) => void; // provide to make the snail draggable
   previewFraction?: number | null; // hold the snail here (e.g. while a follow-up modal is open)
-  startLabel?: string; // shown under the left edge (e.g. when work started today)
-  endLabel?: string; // shown under the right edge (e.g. start + target hours)
   dragLabel?: (fraction: number) => string; // computes the label shown below the snail while dragging (e.g. "+0:35")
 }
 
@@ -21,8 +19,6 @@ export function ProgressBar({
   paused = false,
   onSeek,
   previewFraction,
-  startLabel,
-  endLabel,
   dragLabel,
 }: ProgressBarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -90,12 +86,6 @@ export function ProgressBar({
           </span>
         )}
       </div>
-      {(startLabel !== undefined || endLabel !== undefined) && (
-        <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-          <span>{startLabel ?? ''}</span>
-          <span>{endLabel ?? ''}</span>
-        </div>
-      )}
     </div>
   );
 }
