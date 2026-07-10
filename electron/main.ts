@@ -79,11 +79,11 @@ function createMainWindow() {
     mainWindow?.webContents.reload();
   });
 
-  mainWindow.on('close', (e) => {
-    if (!(app as any).isQuitting) {
-      e.preventDefault();
-      mainWindow?.hide();
-    }
+  // Close = quit (not hide-to-tray) — the tray icon still offers pause/resume/overlay while the
+  // app is running, and "Quit Shelltime" there.
+  mainWindow.on('close', () => {
+    (app as any).isQuitting = true;
+    app.quit();
   });
 }
 
