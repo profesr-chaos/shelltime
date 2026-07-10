@@ -42,6 +42,9 @@ let tray: Tray | null = null;
 let timer: TimerEngine;
 let attention: AttentionMonitor;
 let overlaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
+// Main's own record of the overlay's intended size — passed explicitly on every setBounds call so
+// a frameless non-resizable window can't drift in size from DPI rounding while being dragged.
+let overlayExpectedSize = { width: 320, height: 220 };
 
 function todayStr(): string {
   return logicalDayStr();
@@ -83,6 +86,7 @@ function createOverlayWindow() {
   const settings = db.getSettings();
   const pos = settings.overlayPosition;
   const size = settings.overlayCompact ? { width: 340, height: 44 } : { width: 320, height: 220 };
+  overlayExpectedSize = size;
 
   overlayWindow = new BrowserWindow({
     ...size,
@@ -162,6 +166,7 @@ function createTray() {
 }
 
 function resizeOverlayWindow(width: number, height: number) {
+  overlayExpectedSize = { width, height };
   if (!overlayWindow) return;
   // setSize can silently no-op on a non-resizable window on Windows; toggling resizable works around it.
   overlayWindow.setResizable(true);
@@ -410,7 +415,9 @@ function registerIpc() {
   // Custom drag: the renderer distinguishes click vs drag, then repositions the frameless window here.
   handle('overlay:setPosition', (_e, x: number, y: number) => {
     if (!overlayWindow) return;
-    overlayWindow.setPosition(Math.round(x), Math.round(y));
+    // setBounds (not setPosition) pins the size explicitly on every move — setPosition alone lets
+    // Windows DPI rounding drift inflate a frameless non-resizable window while it's being dragged.
+    overlayWindow.setBounds({ x: Math.round(x), y: Math.round(y), ...overlayExpectedSize });
     if (overlaySaveTimeout) clearTimeout(overlaySaveTimeout);
     overlaySaveTimeout = setTimeout(() => db.updateSettings({ overlayPosition: { x: Math.round(x), y: Math.round(y) } }), 400);
   });
@@ -432,7 +439,7 @@ function registerIpc() {
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       const x = Math.round(workArea.x + (workArea.width - w) / 2);
       const y = Math.round(workArea.y + (workArea.height - h) / 2);
-      overlayWindow.setPosition(x, y);
+      overlayWindow.setBounds({ x, y, ...overlayExpectedSize });
       overlayWindow.focus();
       db.updateSettings({ overlayPosition: { x, y } });
     }
