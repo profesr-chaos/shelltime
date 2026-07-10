@@ -17,13 +17,23 @@ const toClockValue = (iso: string): string => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-// Combine the session's own date with an edited HH:MM into a full ISO timestamp in local time.
-const toIso = (date: string, clock: string): string => {
+// Combine an edited HH:MM with `anchorIso`'s actual calendar date (not session.date, which is the
+// *logical* day — up to 4h earlier than the calendar day for a post-midnight session) into a full
+// ISO timestamp in local time. `rollIfBefore`, when given, pushes the result to the next calendar
+// day if `clock` is earlier than it — how a session that spans real midnight (e.g. 23:00–01:00)
+// gets its end clock reconstructed on the right day.
+const toIso = (anchorIso: string, clock: string, rollIfBefore?: string): string => {
   const [h, m] = clock.split(':').map(Number);
-  const d = new Date(date + 'T00:00:00');
+  const d = new Date(anchorIso);
   d.setHours(h, m, 0, 0);
+  if (rollIfBefore !== undefined && clock < rollIfBefore) d.setDate(d.getDate() + 1);
   return d.toISOString();
 };
+
+// HH:MM drops seconds, so reconstructing "the whole session" would otherwise slice a few seconds
+// short and leave a sub-minute stub on the old project — snap back to the exact bound when close.
+const snapToBound = (iso: string, boundIso: string): string =>
+  Math.abs(new Date(iso).getTime() - new Date(boundIso).getTime()) < 60_000 ? boundIso : iso;
 
 export function ReassignSessionModal({ session, projects, onClose, onSaved }: ReassignSessionModalProps) {
   const active = projects.filter((p) => p.isActive || p.id === session.projectId);
@@ -33,12 +43,19 @@ export function ReassignSessionModal({ session, projects, onClose, onSaved }: Re
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
-  const valid = start < end;
+  const startIso = toIso(session.startedAt, start);
+  const endIso = toIso(session.startedAt, end, start);
+  const valid = startIso < endIso;
 
   const save = async () => {
     if (!valid) return;
     setSaving(true);
-    await window.api.sessions.reallocate(session.id, toIso(session.date, start), toIso(session.date, end), projectId);
+    await window.api.sessions.reallocate(
+      session.id,
+      snapToBound(startIso, session.startedAt),
+      snapToBound(endIso, session.endedAt),
+      projectId
+    );
     setSaving(false);
     toast('Session reassigned');
     onSaved();
