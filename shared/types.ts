@@ -125,6 +125,7 @@ export interface MonthlyDailyTotal {
   targetMinutes: number;
   status: 'under' | 'met' | 'over';
   projectCodes: string[];
+  isWorkingDay: boolean;
 }
 
 export interface MonthlyInsights {

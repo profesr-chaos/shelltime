@@ -201,12 +201,15 @@ export function isWorkingDay(dateStr: string): boolean {
 }
 
 function workingDaysInMonth(month: string): string[] {
+  return allDaysInMonth(month).filter(isWorkingDay);
+}
+
+function allDaysInMonth(month: string): string[] {
   const [y, m] = month.split('-').map(Number);
   const days: string[] = [];
   const daysInMonth = new Date(y, m, 0).getDate();
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    if (isWorkingDay(dateStr)) days.push(dateStr);
+    days.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
   return days;
 }
@@ -700,11 +703,13 @@ export function getMonthlySummary(month: string): MonthlySummary {
     byDateMap.set(e.date, (byDateMap.get(e.date) ?? 0) + e.durationMinutes);
     codesByDate.set(e.date, [...(codesByDate.get(e.date) ?? []), e.project.code]);
   }
-  const workingDays = workingDaysInMonth(month);
-  const dailyTotals: MonthlyDailyTotal[] = workingDays.map((date) => {
+  // dailyTotals spans the whole month (so weekends/off days render in the chart), but each day
+  // carries isWorkingDay so downstream insights/averages can restrict back to working days.
+  const dailyTotals: MonthlyDailyTotal[] = allDaysInMonth(month).map((date) => {
     const minutes = byDateMap.get(date) ?? 0;
-    const dTarget = getDailyTargetMinutes(date);
-    return { date, minutes, targetMinutes: dTarget, status: dayStatus(minutes, dTarget), projectCodes: codesByDate.get(date) ?? [] };
+    const working = isWorkingDay(date);
+    const dTarget = working ? getDailyTargetMinutes(date) : 0;
+    return { date, minutes, targetMinutes: dTarget, status: dayStatus(minutes, dTarget), projectCodes: codesByDate.get(date) ?? [], isWorkingDay: working };
   });
 
   const prev = prevMonth(month);
@@ -729,7 +734,10 @@ export function getMonthlySummary(month: string): MonthlySummary {
   // V1 has no session history, so switches are approximated as timer-sourced project/day rows.
   const projectSwitches = entries.filter((e) => e.source === 'timer').length;
 
-  const nonZeroDays = dailyTotals.filter((d) => d.minutes > 0);
+  // Busiest/quietest/average stay working-day-only — a weekend with tracked time is visible in the
+  // chart (item 11) but shouldn't skew these figures.
+  const workingDayTotals = dailyTotals.filter((d) => d.isWorkingDay);
+  const nonZeroDays = workingDayTotals.filter((d) => d.minutes > 0);
   const busiest = nonZeroDays.length ? nonZeroDays.reduce((a, b) => (b.minutes > a.minutes ? b : a)) : null;
   const quietest = nonZeroDays.length ? nonZeroDays.reduce((a, b) => (b.minutes < a.minutes ? b : a)) : null;
   const workedDaysCount = nonZeroDays.length || 1;

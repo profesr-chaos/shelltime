@@ -107,8 +107,12 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="mb-4 text-base font-bold text-slate-900">Daily Totals (working days)</h2>
-          <BarChart data={summary.dailyTotals} targetMinutes={summary.dailyTotals[0]?.targetMinutes ?? 480} onBarClick={setEditDate} />
+          <h2 className="mb-4 text-base font-bold text-slate-900">Daily Totals</h2>
+          <BarChart
+            data={summary.dailyTotals}
+            targetMinutes={summary.dailyTotals.find((d) => d.isWorkingDay)?.targetMinutes ?? 480}
+            onBarClick={setEditDate}
+          />
           {overtimeDeltaMinutes !== 0 && (
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm">
               <TrendUpIcon className="text-emerald-600" width={16} height={16} />
