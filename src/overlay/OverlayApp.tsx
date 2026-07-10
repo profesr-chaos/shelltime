@@ -261,7 +261,12 @@ export function OverlayApp() {
       <div className={`px-4 pb-3 transition-opacity ${onBreak ? 'opacity-40 grayscale' : ''}`}>
         <div className="flex items-center justify-between">
           {project ? (
-            <span className="rounded-md bg-amber px-2 py-0.5 text-xs font-bold text-white">{project.code}</span>
+            <button
+              onClick={() => setSwitchOpen((v) => !v)}
+              className="no-drag rounded-md bg-amber px-2 py-0.5 text-xs font-bold text-white hover:bg-orange-600"
+            >
+              {project.code}
+            </button>
           ) : (
             <button
               onClick={() => setSwitchOpen((v) => !v)}
