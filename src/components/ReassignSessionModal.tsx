@@ -43,21 +43,25 @@ export function ReassignSessionModal({ session, projects, onClose, onSaved }: Re
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
-  const startIso = toIso(session.startedAt, start);
-  const endIso = toIso(session.startedAt, end, start);
+  // Only a midnight-spanning session (its end clock reads earlier than its start clock) can mean
+  // "next calendar day" by a clock earlier than the session's start; on a same-day session that's
+  // just an invalid range. The end anchors on the (possibly rolled) start so both land together.
+  const spansMidnight = toClockValue(session.endedAt) < toClockValue(session.startedAt);
+  const startIso = toIso(session.startedAt, start, spansMidnight ? toClockValue(session.startedAt) : undefined);
+  const endIso = toIso(startIso, end, spansMidnight ? start : undefined);
   const valid = startIso < endIso;
 
   const save = async () => {
     if (!valid) return;
     setSaving(true);
-    await window.api.sessions.reallocate(
+    const applied = await window.api.sessions.reallocate(
       session.id,
       snapToBound(startIso, session.startedAt),
       snapToBound(endIso, session.endedAt),
       projectId
     );
     setSaving(false);
-    toast('Session reassigned');
+    toast(applied ? 'Session reassigned' : 'Nothing reassigned — times are outside the session');
     onSaved();
     onClose();
   };

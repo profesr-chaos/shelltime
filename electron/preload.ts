@@ -83,7 +83,7 @@ const api = {
   },
   sessions: {
     list: (date: string): Promise<Session[]> => ipcRenderer.invoke('sessions:list', date),
-    reallocate: (sessionId: number, startIso: string, endIso: string, toProjectId: number): Promise<void> =>
+    reallocate: (sessionId: number, startIso: string, endIso: string, toProjectId: number): Promise<boolean> =>
       ipcRenderer.invoke('sessions:reallocate', sessionId, startIso, endIso, toProjectId),
   },
   review: {

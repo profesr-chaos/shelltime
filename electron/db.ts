@@ -851,16 +851,18 @@ export function trimSessionSeconds(date: string, projectId: number, seconds: num
 
 // Move the [start, end] slice of a session to another project, splitting the session if the slice
 // is interior, and move the corresponding minutes in daily_project_time from the old project to
-// the new one. Wrapped in a transaction so the split and the total move are atomic.
-export function reallocateSessionSlice(sessionId: number, startIso: string, endIso: string, toProjectId: number): void {
-  const txn = db.transaction(() => {
+// the new one. Wrapped in a transaction so the split and the total move are atomic. Returns false
+// when nothing changed (missing session, or the slice clamps to empty) so the UI can say so
+// instead of reporting success.
+export function reallocateSessionSlice(sessionId: number, startIso: string, endIso: string, toProjectId: number): boolean {
+  const txn = db.transaction((): boolean => {
     const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as any;
-    if (!row) return;
+    if (!row) return false;
     const sessionStart = row.started_at as string;
     const sessionEnd = row.ended_at as string;
     const clampedStart = startIso < sessionStart ? sessionStart : startIso;
     const clampedEnd = endIso > sessionEnd ? sessionEnd : endIso;
-    if (clampedStart >= clampedEnd) return;
+    if (clampedStart >= clampedEnd) return false;
 
     const date = row.date as string;
     const fromProjectId = row.project_id as number;
@@ -891,8 +893,9 @@ export function reallocateSessionSlice(sessionId: number, startIso: string, endI
     const mins = (new Date(clampedEnd).getTime() - new Date(clampedStart).getTime()) / 60000;
     addTimeToProject(date, fromProjectId, -mins, 'manual');
     addTimeToProject(date, toProjectId, mins, 'manual');
+    return true;
   });
-  txn();
+  return txn();
 }
 
 export { workingDaysInMonth, prevMonth };

@@ -385,11 +385,12 @@ function registerIpc() {
     const touchesActiveToday =
       !!session && session.date === todayStr() && (session.projectId === activeProjectId || toProjectId === activeProjectId);
     if (touchesActiveToday) timer.flushActive();
-    db.reallocateSessionSlice(sessionId, startIso, endIso, toProjectId);
+    const applied = db.reallocateSessionSlice(sessionId, startIso, endIso, toProjectId);
     if (touchesActiveToday && activeProjectId !== null) {
       timer.resyncProjectTotal(activeProjectId);
       broadcast('timer:update', timer.getState());
     }
+    return applied;
   });
 
   handle('timer:getState', () => timer.getState());
