@@ -274,6 +274,20 @@ function registerIpc() {
 
   handle('day:getFirstStart', (_e, date) => db.getDayFirstStartedAt(date));
 
+  handle('sessions:list', (_e, date: string) => db.listSessionsForDate(date));
+  handle('sessions:reallocate', (_e, sessionId: number, startIso: string, endIso: string, toProjectId: number) => {
+    const session = db.getSessionById(sessionId);
+    const activeProjectId = timer.getState().activeProjectId;
+    const touchesActiveToday =
+      !!session && session.date === todayStr() && (session.projectId === activeProjectId || toProjectId === activeProjectId);
+    if (touchesActiveToday) timer.flushActive();
+    db.reallocateSessionSlice(sessionId, startIso, endIso, toProjectId);
+    if (touchesActiveToday && activeProjectId !== null) {
+      timer.resyncProjectTotal(activeProjectId);
+      broadcast('timer:update', timer.getState());
+    }
+  });
+
   handle('timer:getState', () => timer.getState());
   handle('timer:start', (_e, projectId) => {
     timer.start(projectId);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DailyEntry, DailyTargetStatus, Note, Project } from '@shared/types';
+import type { DailyEntry, DailyTargetStatus, Note, Project, Session } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useTimer } from '@/hooks/useTimer';
 import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms, formatClockTime, signedMinutesToHhMm } from '@/lib/format';
@@ -13,6 +13,7 @@ import { AddEditProjectModal } from '@/components/AddEditProjectModal';
 import { DistributeDeltaModal } from '@/components/DistributeDeltaModal';
 import { NotesModal } from '@/components/NotesModal';
 import { FinishedForToday } from '@/components/FinishedForToday';
+import { ReassignSessionModal } from '@/components/ReassignSessionModal';
 
 const shiftDay = (date: string, delta: number): string => {
   const d = new Date(date + 'T00:00:00');
@@ -36,6 +37,8 @@ export function Today() {
   const [distributeDelta, setDistributeDelta] = useState<number | null>(null);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
   const [notesFor, setNotesFor] = useState<{ date: string; project: Project } | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [reassignSession, setReassignSession] = useState<Session | null>(null);
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
@@ -46,6 +49,7 @@ export function Today() {
       for (const n of notes) map.set(n.projectId, (map.get(n.projectId) ?? 0) + 1);
       setNotesByProject(map);
     });
+    window.api.sessions.list(date).then(setSessions);
     const y = new Date(date + 'T00:00:00');
     y.setDate(y.getDate() - 1);
     const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
@@ -250,6 +254,34 @@ export function Today() {
         </div>
       </div>
 
+      {sessions.length > 0 && (
+        <div className="mt-10">
+          <h2 className="mb-4 text-lg font-bold text-slate-900">Timeline</h2>
+          <div className="flex flex-col gap-2">
+            {sessions.map((session) => (
+              <div key={session.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-slate-500">
+                    {formatClockTime(session.startedAt)}–{formatClockTime(session.endedAt)}
+                  </span>
+                  <ColorDot color={session.project.color} />
+                  <span className="font-semibold text-slate-800">{session.project.code}</span>
+                  <span className="text-slate-400">
+                    {minutesToHhMm((new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime()) / 60_000)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setReassignSession(session)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-amber hover:bg-amber-50"
+                >
+                  Reassign
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {editEntry && (
         <ManualTimeModal
           date={date}
@@ -278,6 +310,15 @@ export function Today() {
           projects={projects}
           deltaMinutes={distributeDelta}
           onClose={() => { setDistributeDelta(null); setSeekPreview(null); }}
+          onSaved={load}
+        />
+      )}
+
+      {reassignSession && (
+        <ReassignSessionModal
+          session={reassignSession}
+          projects={projects}
+          onClose={() => setReassignSession(null)}
           onSaved={load}
         />
       )}

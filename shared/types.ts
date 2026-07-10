@@ -36,6 +36,17 @@ export interface ProjectHistory {
   notes: Note[];
 }
 
+// Informational record of when work happened, distinct from daily_project_time (the source of
+// truth for totals). Powers the day timeline and session reassignment; never used to derive totals.
+export interface Session {
+  id: number;
+  date: string;
+  projectId: number;
+  startedAt: string; // ISO timestamp
+  endedAt: string; // ISO timestamp, kept fresh while running
+  project: Project;
+}
+
 export type LeaveType = 'holiday' | 'sick';
 
 export interface LeaveRecord {

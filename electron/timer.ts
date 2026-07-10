@@ -17,6 +17,9 @@ export class TimerEngine {
   private finishedOn: string | null = db.getFinishedOn();
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private onUpdate: (state: TimerState) => void;
+  // The currently-open `sessions` row (informational; see db.ts table comment). Null whenever
+  // nothing is running.
+  private openSessionId: number | null = null;
 
   constructor(opts: { onUpdate: (state: TimerState) => void }) {
     this.onUpdate = opts.onUpdate;
@@ -41,10 +44,14 @@ export class TimerEngine {
   private rolloverDayIfNeeded() {
     const today = todayStr();
     if (today !== this.currentDate) {
-      this.commitElapsed(); // bank in-flight seconds to the old date before switching
+      this.commitElapsed(); // bank in-flight seconds to the old date and close out its session
       this.currentDate = today;
       this.accumulatedSecondsToday = 0;
       this.clearFinishedIfNewWorkday();
+      if (this.status === 'running' && this.activeProjectId !== null) {
+        const ts = new Date().toISOString();
+        this.openSessionId = db.insertSession(this.currentDate, this.activeProjectId, ts, ts);
+      }
       this.emit();
     }
   }
@@ -92,6 +99,7 @@ export class TimerEngine {
         this.status = 'idle';
         this.activeProjectId = null;
         this.sessionStartedAt = null;
+        this.openSessionId = null;
         this.emit();
         return;
       }
@@ -99,12 +107,14 @@ export class TimerEngine {
       db.addTimeToProject(this.currentDate, this.activeProjectId, elapsed / 60, 'timer');
       this.accumulatedSecondsToday += elapsed;
       this.sessionStartedAt = Date.now();
+      if (this.openSessionId !== null) db.touchSessionEnd(this.openSessionId, new Date().toISOString());
     }
   }
 
   /** Remove idle seconds that were banked to a project (e.g. the user was away, not in a meeting). */
   discardSeconds(projectId: number, seconds: number) {
     db.addTimeToProject(this.currentDate, projectId, -seconds / 60, 'timer');
+    db.trimSessionSeconds(this.currentDate, projectId, seconds);
     if (this.activeProjectId === projectId) {
       this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
       this.emit();
@@ -139,6 +149,8 @@ export class TimerEngine {
     this.status = 'running';
     this.sessionStartedAt = Date.now();
     this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
+    const ts = new Date().toISOString();
+    this.openSessionId = db.insertSession(this.currentDate, projectId, ts, ts);
     this.emit();
   }
 
@@ -147,6 +159,7 @@ export class TimerEngine {
     this.flush();
     this.status = 'paused';
     this.sessionStartedAt = null;
+    this.openSessionId = null;
     this.emit();
   }
 
@@ -155,6 +168,8 @@ export class TimerEngine {
     this.rolloverDayIfNeeded();
     this.status = 'running';
     this.sessionStartedAt = Date.now();
+    const ts = new Date().toISOString();
+    this.openSessionId = db.insertSession(this.currentDate, this.activeProjectId, ts, ts);
     this.emit();
   }
 
@@ -168,6 +183,7 @@ export class TimerEngine {
       this.status = 'idle';
       this.activeProjectId = null;
       this.sessionStartedAt = null;
+      this.openSessionId = null;
     }
     this.emit();
   }
@@ -177,6 +193,7 @@ export class TimerEngine {
       this.status = 'idle';
       this.activeProjectId = null;
       this.sessionStartedAt = null;
+      this.openSessionId = null;
       this.emit();
     }
   }
@@ -191,6 +208,8 @@ export class TimerEngine {
     this.status = 'running';
     this.sessionStartedAt = Date.now();
     this.accumulatedSecondsToday = this.committedSecondsFor(projectId);
+    const ts = new Date().toISOString();
+    this.openSessionId = db.insertSession(this.currentDate, projectId, ts, ts);
     this.emit();
   }
 

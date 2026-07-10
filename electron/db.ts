@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
-import { isPublicHoliday } from './holidays';
+import { isPublicHoliday } from './holidays.ts';
 import type {
   Project,
   DailyEntry,
@@ -13,8 +13,9 @@ import type {
   LeaveType,
   LeaveRecord,
   LeaveSummary,
+  Session,
 } from '../shared/types';
-import { OVERLAY_OPACITY_FLOOR } from '../shared/types';
+import { OVERLAY_OPACITY_FLOOR } from '../shared/types.ts';
 
 let db: Database.Database;
 
@@ -113,6 +114,17 @@ export function initDb(userDataDir: string) {
       date TEXT PRIMARY KEY,
       first_started_at TEXT NOT NULL
     );
+
+    -- Informational record of when work happened. daily_project_time remains the source of truth
+    -- for totals; sessions are never used to derive them.
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      started_at TEXT NOT NULL,
+      ended_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date);
   `);
 
   runMigrations();
@@ -120,7 +132,7 @@ export function initDb(userDataDir: string) {
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [
@@ -168,6 +180,9 @@ function runMigrations() {
         db.prepare("DELETE FROM settings WHERE key = 'autoPauseIdleMinutes'").run();
       }
     },
+    // migrations[5]: v5 -> v6 — sessions table added above via CREATE TABLE IF NOT EXISTS; nothing
+    // to migrate, this entry just keeps the version counter in sync.
+    () => {},
   ];
   for (let v = current; v < SCHEMA_VERSION; v++) migrations[v]?.();
   if (current < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -317,6 +332,7 @@ export function setProjectActive(id: number, isActive: boolean): Project {
 export function deleteProject(id: number): void {
   db.prepare('DELETE FROM notes WHERE project_id = ?').run(id);
   db.prepare('DELETE FROM daily_project_time WHERE project_id = ?').run(id);
+  db.prepare('DELETE FROM sessions WHERE project_id = ?').run(id);
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
 }
 
@@ -739,6 +755,124 @@ export function getMonthlySummary(month: string): MonthlySummary {
       averageMinutesPerWorkingDay: actualMinutes / workedDaysCount,
     },
   };
+}
+
+// ---------- sessions (informational — see table comment; never used to derive totals) ----------
+
+function rowToSession(row: any): Session {
+  return {
+    id: row.id,
+    date: row.date,
+    projectId: row.project_id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    project: {
+      id: row.project_id,
+      code: row.p_code,
+      name: row.p_name,
+      color: row.p_color,
+      description: row.p_description,
+      isActive: !!row.p_is_active,
+      createdAt: row.p_created_at,
+      updatedAt: row.p_updated_at,
+    },
+  };
+}
+
+const SESSION_SELECT = `
+  SELECT s.*, p.code as p_code, p.name as p_name, p.color as p_color, p.description as p_description,
+         p.is_active as p_is_active, p.created_at as p_created_at, p.updated_at as p_updated_at
+  FROM sessions s JOIN projects p ON p.id = s.project_id
+`;
+
+export function listSessionsForDate(date: string): Session[] {
+  const rows = db.prepare(`${SESSION_SELECT} WHERE s.date = ? ORDER BY s.started_at ASC`).all(date);
+  return (rows as any[]).map(rowToSession);
+}
+
+export function getSessionById(id: number): Session | null {
+  const row = db.prepare(`${SESSION_SELECT} WHERE s.id = ?`).get(id);
+  return row ? rowToSession(row) : null;
+}
+
+export function insertSession(date: string, projectId: number, startedAt: string, endedAt: string): number {
+  const result = db
+    .prepare('INSERT INTO sessions (date, project_id, started_at, ended_at) VALUES (?, ?, ?, ?)')
+    .run(date, projectId, startedAt, endedAt);
+  return result.lastInsertRowid as number;
+}
+
+export function touchSessionEnd(id: number, endedAt: string): void {
+  db.prepare('UPDATE sessions SET ended_at = ? WHERE id = ?').run(endedAt, id);
+}
+
+// Idle discard: trim `seconds` off the tail of the project's sessions for `date`, newest first,
+// deleting rows that shrink to <= 0. ponytail: tail-trim approximates where the idle actually was
+// — it's the right answer in practice because idle windows end at the moment of discard.
+export function trimSessionSeconds(date: string, projectId: number, seconds: number): void {
+  let remaining = seconds;
+  const rows = db
+    .prepare('SELECT id, started_at, ended_at FROM sessions WHERE date = ? AND project_id = ? ORDER BY id DESC')
+    .all(date, projectId) as { id: number; started_at: string; ended_at: string }[];
+  const del = db.prepare('DELETE FROM sessions WHERE id = ?');
+  const shrink = db.prepare('UPDATE sessions SET ended_at = ? WHERE id = ?');
+  for (const row of rows) {
+    if (remaining <= 0) break;
+    const durationSec = (new Date(row.ended_at).getTime() - new Date(row.started_at).getTime()) / 1000;
+    if (durationSec <= remaining) {
+      del.run(row.id);
+      remaining -= durationSec;
+    } else {
+      shrink.run(new Date(new Date(row.ended_at).getTime() - remaining * 1000).toISOString(), row.id);
+      remaining = 0;
+    }
+  }
+}
+
+// Move the [start, end] slice of a session to another project, splitting the session if the slice
+// is interior, and move the corresponding minutes in daily_project_time from the old project to
+// the new one. Wrapped in a transaction so the split and the total move are atomic.
+export function reallocateSessionSlice(sessionId: number, startIso: string, endIso: string, toProjectId: number): void {
+  const txn = db.transaction(() => {
+    const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as any;
+    if (!row) return;
+    const sessionStart = row.started_at as string;
+    const sessionEnd = row.ended_at as string;
+    const clampedStart = startIso < sessionStart ? sessionStart : startIso;
+    const clampedEnd = endIso > sessionEnd ? sessionEnd : endIso;
+    if (clampedStart >= clampedEnd) return;
+
+    const date = row.date as string;
+    const fromProjectId = row.project_id as number;
+
+    const insert = db.prepare('INSERT INTO sessions (date, project_id, started_at, ended_at) VALUES (?, ?, ?, ?)');
+    const updateProject = db.prepare('UPDATE sessions SET project_id = ? WHERE id = ?');
+    const updateEnd = db.prepare('UPDATE sessions SET ended_at = ? WHERE id = ?');
+
+    if (clampedStart === sessionStart && clampedEnd === sessionEnd) {
+      // whole session retagged
+      updateProject.run(toProjectId, sessionId);
+    } else if (clampedStart === sessionStart) {
+      // prefix slice: retag the front, leave the remainder on the old project
+      updateEnd.run(clampedEnd, sessionId);
+      updateProject.run(toProjectId, sessionId);
+      insert.run(date, fromProjectId, clampedEnd, sessionEnd);
+    } else if (clampedEnd === sessionEnd) {
+      // suffix slice: shrink to what's left, append the slice on the new project
+      updateEnd.run(clampedStart, sessionId);
+      insert.run(date, toProjectId, clampedStart, sessionEnd);
+    } else {
+      // interior slice: three-way split
+      updateEnd.run(clampedStart, sessionId);
+      insert.run(date, toProjectId, clampedStart, clampedEnd);
+      insert.run(date, fromProjectId, clampedEnd, sessionEnd);
+    }
+
+    const mins = (new Date(clampedEnd).getTime() - new Date(clampedStart).getTime()) / 60000;
+    addTimeToProject(date, fromProjectId, -mins, 'manual');
+    addTimeToProject(date, toProjectId, mins, 'manual');
+  });
+  txn();
 }
 
 export { workingDaysInMonth, prevMonth };

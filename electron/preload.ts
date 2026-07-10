@@ -11,6 +11,7 @@ import type {
   LeaveType,
   LeaveRecord,
   LeaveSummary,
+  Session,
 } from '../shared/types';
 
 const api = {
@@ -76,6 +77,11 @@ const api = {
   },
   day: {
     getFirstStart: (date: string): Promise<string | null> => ipcRenderer.invoke('day:getFirstStart', date),
+  },
+  sessions: {
+    list: (date: string): Promise<Session[]> => ipcRenderer.invoke('sessions:list', date),
+    reallocate: (sessionId: number, startIso: string, endIso: string, toProjectId: number): Promise<void> =>
+      ipcRenderer.invoke('sessions:reallocate', sessionId, startIso, endIso, toProjectId),
   },
   timer: {
     getState: (): Promise<TimerState> => ipcRenderer.invoke('timer:getState'),
