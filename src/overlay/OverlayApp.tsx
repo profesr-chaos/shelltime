@@ -4,6 +4,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { useIdlePrompt } from '@/hooks/useIdlePrompt';
 import { useResumePrompt } from '@/hooks/useResumePrompt';
+import { useMeetingPrompt } from '@/hooks/useMeetingPrompt';
 import { useDayReview } from '@/hooks/useDayReview';
 import { useOverlayDrag } from '@/hooks/useOverlayDrag';
 import { secondsToHms, minutesToHhMm, todayIso, signedMinutesToHhMm } from '@/lib/format';
@@ -19,6 +20,7 @@ export function OverlayApp() {
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
   const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
   const resumePrompt = useResumePrompt();
+  const meetingPrompt = useMeetingPrompt();
   const { review, dismiss: dismissReview } = useDayReview();
   const drag = useOverlayDrag();
 
@@ -105,9 +107,10 @@ export function OverlayApp() {
     if (review) window.api.overlay.setHeight(300);
     else if (onResume) window.api.overlay.setHeight(250);
     else if (idle) window.api.overlay.setHeight(210);
+    else if (meetingPrompt.projectId !== null) window.api.overlay.setHeight(280);
     else if (onBreak) window.api.overlay.setHeight(390);
     else window.api.overlay.setHeight(compact ? 32 : 240);
-  }, [review, idle, onResume, onBreak, compact]);
+  }, [review, idle, onResume, meetingPrompt.projectId, onBreak, compact]);
 
   if (review) {
     const delta = review.totalMinutes - review.targetMinutes;
@@ -183,11 +186,15 @@ export function OverlayApp() {
     const idleMinutes = Math.max(1, Math.round(liveIdleSeconds / 60));
     return (
       <div {...drag} className={`${theme} flex h-full w-full select-none flex-col justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
-        <p className="text-sm font-bold text-slate-900 dark:text-white">{idle.frozen ? 'Welcome back' : 'Still working?'}</p>
+        <p className="text-sm font-bold text-slate-900 dark:text-white">
+          {idle.duringMeeting ? 'You were in a meeting' : idle.frozen ? 'Welcome back' : 'Still working?'}
+        </p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-          {idle.frozen
-            ? `Away${idleProject ? ` on ${idleProject.code}` : ''} - keep the banked time or discard it?`
-            : `Idle${idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?`}
+          {idle.duringMeeting
+            ? 'Your calendar shows you were busy - keep the time?'
+            : idle.frozen
+              ? `Away${idleProject ? ` on ${idleProject.code}` : ''} - keep the banked time or discard it?`
+              : `Idle${idleProject ? ` on ${idleProject.code}` : ''}. Keep the time or discard it?`}
         </p>
         <p className="mt-1 text-center font-mono text-2xl font-bold tabular-nums text-amber">{secondsToHms(liveIdleSeconds)}</p>
         <div className="mt-3 flex gap-2">
@@ -204,6 +211,34 @@ export function OverlayApp() {
             Discard {idleMinutes}m
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (meetingPrompt.projectId !== null) {
+    const meetingProject = projects.find((p) => p.id === meetingPrompt.projectId);
+    return (
+      <div {...drag} className={`${theme} flex h-full w-full select-none flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+        <p className="text-sm font-bold text-slate-900 dark:text-white">In a meeting</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+          Still working on {meetingProject?.code ?? 'this'}?
+        </p>
+        <div className="relative mt-2 flex-1">
+          <QuickSwitchMenu
+            projects={projects}
+            activeProjectId={meetingPrompt.projectId}
+            onSelect={switchProject}
+            onClose={meetingPrompt.dismiss}
+            anchorClassName="inset-x-0 top-0"
+            heading="Switch to"
+          />
+        </div>
+        <button
+          onClick={meetingPrompt.dismiss}
+          className="no-drag mt-2 w-full rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
+        >
+          Yes, still {meetingProject?.code ?? 'this'}
+        </button>
       </div>
     );
   }

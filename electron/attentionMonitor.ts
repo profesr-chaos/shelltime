@@ -4,10 +4,21 @@ export interface IdlePromptPayload {
   projectId: number;
   idleSeconds: number;
   frozen: boolean; // true = a fixed, already-elapsed amount (shown post-resume); false = live/growing
+  duringMeeting: boolean; // the banked window overlapped a calendar busy block — "were you in a meeting?"
 }
 
 export interface ResumePromptPayload {
   projectId: number;
+}
+
+export interface MeetingPromptPayload {
+  projectId: number;
+}
+
+// Busy/free calendar lookup — optional; absent when the calendar feature is off (no ICS URL set).
+export interface CalendarLike {
+  isBusy(atMs: number): boolean;
+  currentBusyBlock(atMs: number): { startMs: number; endMs: number } | null;
 }
 
 // Minimal surfaces AttentionMonitor depends on — kept separate from the concrete TimerEngine/db/
@@ -49,6 +60,8 @@ interface AttentionCallbacks {
   onResumeResolved: () => void;
   onBreakPrompt: (minutesWorked: number) => void;
   onBreakDismissed: () => void;
+  onMeetingPrompt: (payload: MeetingPromptPayload) => void;
+  onMeetingDismissed: () => void;
   onStateChange: () => void;
 }
 
@@ -57,6 +70,10 @@ interface AttentionDeps {
   powerMonitor: PowerMonitorLike;
   now?: () => number;
   autoStart?: boolean; // false in tests — call tick() manually instead of a real 1s interval
+  calendar?: CalendarLike; // absent = calendar feature off, zero behaviour change
+  // True if the last project start/switch today is older than the configured suggest threshold —
+  // kept db-free here; the caller (main.ts) owns the actual query.
+  shouldSuggestMeetingSwitch?: () => boolean;
 }
 
 /**
@@ -95,6 +112,13 @@ export class AttentionMonitor {
 
   // When the current pause began — only reset the break clock after a real break (>5 min).
   private pausedAt: number | null = null;
+
+  // Frozen banked window from an escalated idle prompt overlapped a calendar busy block.
+  private pendingBankedDuringMeeting = false;
+
+  // Meeting-start switch suggestion — at most one open per busy block.
+  private meetingPromptOpen = false;
+  private wasBusy = false;
 
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private readonly now: () => number;
@@ -136,6 +160,7 @@ export class AttentionMonitor {
     if (this.state === 'stopped') return;
     if (this.idlePromptOpen) this.freezeLiveIdlePrompt();
     this.dismissBreakPrompt();
+    if (this.meetingPromptOpen) this.dismissMeetingPrompt();
     this.pausedAt = this.now();
     this.resumeArmed = false;
     this.state = 'paused_manual';
@@ -153,6 +178,7 @@ export class AttentionMonitor {
     this.clearIdlePrompt();
     this.pendingBankedSeconds = null;
     this.pendingBankedProjectId = null;
+    if (this.meetingPromptOpen) this.dismissMeetingPrompt();
     if (wasIdle) this.resetBreakClock();
     else this.maybeResetBreakClock();
     this.pausedAt = null;
@@ -169,11 +195,13 @@ export class AttentionMonitor {
       this.resumePromptOpen = false;
       this.cb.onResumeResolved();
     }
+    if (this.meetingPromptOpen) this.dismissMeetingPrompt();
     this.idleWindowStart = null;
     this.idlePromptOpenedAt = null;
     this.idleProjectId = null;
     this.pendingBankedSeconds = null;
     this.pendingBankedProjectId = null;
+    this.pendingBankedDuringMeeting = false;
     this.resumeTrialStartedAt = null;
     this.resumeArmed = false;
     this.pausedAt = null;
@@ -194,6 +222,7 @@ export class AttentionMonitor {
       // force-resumes; we're already 'active' here since the banked prompt only shows post-resume).
       this.pendingBankedSeconds = null;
       this.pendingBankedProjectId = null;
+      this.pendingBankedDuringMeeting = false;
     } else if (this.idleWindowStart !== null && this.idleProjectId !== null) {
       if (discard) {
         const seconds = (this.now() - this.idleWindowStart) / 1000;
@@ -227,6 +256,12 @@ export class AttentionMonitor {
     this.resumeTrialStartedAt = null;
     this.cb.onResumeResolved();
     this.cb.onStateChange();
+  }
+
+  /** "Yes" on the meeting-switch prompt — dismiss without switching. Picking a project instead
+   * resolves it via notifySwitch (called from the timer:switch handler). */
+  resolveMeeting() {
+    if (this.meetingPromptOpen) this.dismissMeetingPrompt();
   }
 
   snoozeBreak(remindInMinutes?: number) {
@@ -279,7 +314,7 @@ export class AttentionMonitor {
     this.idlePromptOpenedAt = this.now();
     this.idlePromptOpen = true;
     this.state = 'idle_prompt';
-    this.cb.onIdlePrompt({ projectId, idleSeconds, frozen: false });
+    this.cb.onIdlePrompt({ projectId, idleSeconds, frozen: false, duringMeeting: false });
   }
 
   // Escalation: dismiss the live prompt (no one's there to see it), pause, and bank the exact
@@ -287,9 +322,11 @@ export class AttentionMonitor {
   // keep/discard until the user is actually back to answer.
   private freezeLiveIdlePrompt() {
     if (this.idleWindowStart === null || this.idleProjectId === null) return;
-    const seconds = (this.now() - this.idleWindowStart) / 1000;
-    this.pendingBankedSeconds = seconds;
+    const nowMs = this.now();
+    const midpoint = (this.idleWindowStart + nowMs) / 2;
+    this.pendingBankedSeconds = (nowMs - this.idleWindowStart) / 1000;
     this.pendingBankedProjectId = this.idleProjectId;
+    this.pendingBankedDuringMeeting = this.deps.calendar?.currentBusyBlock(midpoint) != null;
     this.idlePromptOpen = false;
     this.idleWindowStart = null;
     this.idlePromptOpenedAt = null;
@@ -300,7 +337,25 @@ export class AttentionMonitor {
   private showBankedPrompt() {
     if (this.pendingBankedProjectId === null || this.pendingBankedSeconds === null) return;
     this.idlePromptOpen = true;
-    this.cb.onIdlePrompt({ projectId: this.pendingBankedProjectId, idleSeconds: this.pendingBankedSeconds, frozen: true });
+    this.cb.onIdlePrompt({
+      projectId: this.pendingBankedProjectId,
+      idleSeconds: this.pendingBankedSeconds,
+      frozen: true,
+      duringMeeting: this.pendingBankedDuringMeeting,
+    });
+  }
+
+  private dismissMeetingPrompt() {
+    this.meetingPromptOpen = false;
+    this.cb.onMeetingDismissed();
+  }
+
+  private maybeSuggestMeetingSwitch() {
+    const projectId = this.timer.getState().activeProjectId;
+    if (projectId === null) return;
+    if (!this.deps.shouldSuggestMeetingSwitch?.()) return;
+    this.meetingPromptOpen = true;
+    this.cb.onMeetingPrompt({ projectId });
   }
 
   private escalateToAway() {
@@ -339,6 +394,7 @@ export class AttentionMonitor {
         // Default to keep, silently — matches "closing the prompt defaults to Keep".
         this.pendingBankedSeconds = null;
         this.pendingBankedProjectId = null;
+        this.pendingBankedDuringMeeting = false;
       } else {
         this.showBankedPrompt();
       }
@@ -356,19 +412,31 @@ export class AttentionMonitor {
   tick() {
     this.reconcileWithTimer();
 
+    const busy = this.deps.calendar?.isBusy(this.now()) ?? false;
+    const justBecameBusy = busy && !this.wasBusy;
+    const justBecameFree = !busy && this.wasBusy;
+    this.wasBusy = busy;
+    if (this.meetingPromptOpen && justBecameFree) this.dismissMeetingPrompt();
+
     if (this.state === 'active') {
-      const idleMinutes = this.deps.getSettings().idlePromptMinutes;
-      if (idleMinutes > 0) {
-        const idleSeconds = this.deps.powerMonitor.getSystemIdleTime();
-        if (idleSeconds >= idleMinutes * 60) {
-          this.openLiveIdlePrompt(idleSeconds);
-          return;
+      // A meeting counts as work, not idleness: suppress the idle prompt while busy, and don't
+      // fire the break prompt mid-meeting (it fires after, once continuousWorkSeconds already
+      // cleared the threshold — the clock itself keeps accruing below, unsuppressed).
+      if (justBecameBusy && !this.meetingPromptOpen) this.maybeSuggestMeetingSwitch();
+      if (!busy) {
+        const idleMinutes = this.deps.getSettings().idlePromptMinutes;
+        if (idleMinutes > 0) {
+          const idleSeconds = this.deps.powerMonitor.getSystemIdleTime();
+          if (idleSeconds >= idleMinutes * 60) {
+            this.openLiveIdlePrompt(idleSeconds);
+            return;
+          }
         }
       }
       if (!this.resumePromptOpen) {
         this.continuousWorkSeconds += 1;
         const settings = this.deps.getSettings();
-        if (!settings.grindMode && !this.breakPromptFired && this.continuousWorkSeconds >= settings.breakIntervalMinutes * 60) {
+        if (!busy && !settings.grindMode && !this.breakPromptFired && this.continuousWorkSeconds >= settings.breakIntervalMinutes * 60) {
           this.breakPromptFired = true;
           this.cb.onBreakPrompt(Math.round(this.continuousWorkSeconds / 60));
         }

@@ -60,6 +60,26 @@ function settings(overrides: Partial<AttentionSettingsLike> = {}): AttentionSett
   return { idlePromptMinutes: 10, idleResumeMode: 'auto', breakIntervalMinutes: 60, grindMode: false, ...overrides };
 }
 
+// Fake calendar for the meeting-suppression tests: a single settable busy block, mirroring the
+// CalendarLike surface AttentionMonitor depends on.
+class FakeCalendar {
+  private block: { startMs: number; endMs: number } | null = null;
+  setBusy(block: { startMs: number; endMs: number } | null) {
+    this.block = block;
+  }
+  isBusy(atMs: number) {
+    return this.currentBusyBlock(atMs) !== null;
+  }
+  currentBusyBlock(atMs: number) {
+    return this.block && atMs >= this.block.startMs && atMs < this.block.endMs ? this.block : null;
+  }
+}
+
+interface HarnessDeps {
+  calendar?: FakeCalendar;
+  shouldSuggestMeetingSwitch?: () => boolean;
+}
+
 interface Harness {
   monitor: AttentionMonitor;
   timer: FakeTimer;
@@ -68,19 +88,28 @@ interface Harness {
   openPrompts: () => number;
   maxOpenPrompts: () => number;
   breakFires: () => number;
+  meetingPrompts: () => number;
+  meetingDismissals: () => number;
+  lastMeetingProjectId: () => number | null;
+  lastIdleDuringMeeting: () => boolean | null;
 }
 
-function makeHarness(settingsOverrides: Partial<AttentionSettingsLike> = {}): Harness {
+function makeHarness(settingsOverrides: Partial<AttentionSettingsLike> = {}, deps: HarnessDeps = {}): Harness {
   const timer = new FakeTimer();
   const power = new FakePowerMonitor();
   let clock = 0;
   let open = 0;
   let maxOpen = 0;
   let breakFires = 0;
+  let meetingPrompts = 0;
+  let meetingDismissals = 0;
+  let lastMeetingProjectId: number | null = null;
+  let lastIdleDuringMeeting: boolean | null = null;
   const monitor = new AttentionMonitor(
     timer,
     {
-      onIdlePrompt: () => {
+      onIdlePrompt: (payload) => {
+        lastIdleDuringMeeting = payload.duringMeeting;
         open++;
         maxOpen = Math.max(maxOpen, open);
       },
@@ -102,9 +131,23 @@ function makeHarness(settingsOverrides: Partial<AttentionSettingsLike> = {}): Ha
       onBreakDismissed: () => {
         open--;
       },
+      onMeetingPrompt: (payload) => {
+        meetingPrompts++;
+        lastMeetingProjectId = payload.projectId;
+      },
+      onMeetingDismissed: () => {
+        meetingDismissals++;
+      },
       onStateChange: () => {},
     },
-    { getSettings: () => settings(settingsOverrides), powerMonitor: power, now: () => clock, autoStart: false }
+    {
+      getSettings: () => settings(settingsOverrides),
+      powerMonitor: power,
+      now: () => clock,
+      autoStart: false,
+      calendar: deps.calendar,
+      shouldSuggestMeetingSwitch: deps.shouldSuggestMeetingSwitch,
+    }
   );
   monitor.notifyManualStart();
   return {
@@ -117,6 +160,10 @@ function makeHarness(settingsOverrides: Partial<AttentionSettingsLike> = {}): Ha
     openPrompts: () => open,
     maxOpenPrompts: () => maxOpen,
     breakFires: () => breakFires,
+    meetingPrompts: () => meetingPrompts,
+    meetingDismissals: () => meetingDismissals,
+    lastMeetingProjectId: () => lastMeetingProjectId,
+    lastIdleDuringMeeting: () => lastIdleDuringMeeting,
   };
 }
 
@@ -267,6 +314,126 @@ t('two prompts are never open simultaneously across a mixed sequence', () => {
     }
   }
   assert.ok(h.maxOpenPrompts() <= 1, `expected at most 1 concurrent prompt, saw ${h.maxOpenPrompts()}`);
+});
+
+t('idle threshold crossed during a meeting: no idle prompt, timer keeps running', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar });
+  calendar.setBusy({ startMs: 0, endMs: 60 * 60 * 1000 }); // busy for the next hour
+  h.power.idleTime = 600; // past the 10 min threshold
+  h.monitor.tick();
+  assert.equal(h.monitor.getState(), 'active');
+  assert.equal(h.timer.status, 'running');
+  assert.equal(h.openPrompts(), 0);
+});
+
+t('same idle crossing outside a busy block prompts as before', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar });
+  // No busy block set — calendar.isBusy is always false.
+  h.power.idleTime = 600;
+  h.monitor.tick();
+  assert.equal(h.monitor.getState(), 'idle_prompt');
+  assert.equal(h.openPrompts(), 1);
+});
+
+t('break prompt never fires mid-meeting; fires after the meeting ends once threshold is cleared', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 0, breakIntervalMinutes: 1 }, { calendar });
+  calendar.setBusy({ startMs: 0, endMs: 90 * 1000 }); // busy for the first 90s
+  h.power.idleTime = 0;
+  for (let i = 0; i < 60; i++) h.advance(1000), h.monitor.tick(); // 60s in, still busy, threshold crossed
+  assert.equal(h.breakFires(), 0, 'must not fire while busy even though the clock cleared the threshold');
+  for (let i = 0; i < 40; i++) h.advance(1000), h.monitor.tick(); // now past the busy block
+  assert.equal(h.breakFires(), 1, 'fires once the meeting ends');
+});
+
+t('meeting-start switch suggestion fires when the last switch is stale, at most once per block', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar, shouldSuggestMeetingSwitch: () => true });
+  h.power.idleTime = 0;
+  calendar.setBusy({ startMs: 1000, endMs: 60 * 60 * 1000 });
+  h.advance(1000);
+  h.monitor.tick(); // not-busy -> busy transition
+  assert.equal(h.meetingPrompts(), 1);
+  assert.equal(h.lastMeetingProjectId(), 1);
+
+  // Still busy on the next few ticks — must not refire within the same block.
+  h.advance(1000);
+  h.monitor.tick();
+  h.advance(1000);
+  h.monitor.tick();
+  assert.equal(h.meetingPrompts(), 1, 'fires at most once per busy block');
+});
+
+t('meeting-start switch suggestion does not appear if the user switched recently', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar, shouldSuggestMeetingSwitch: () => false });
+  h.power.idleTime = 0;
+  calendar.setBusy({ startMs: 1000, endMs: 60 * 60 * 1000 });
+  h.advance(1000);
+  h.monitor.tick();
+  assert.equal(h.meetingPrompts(), 0);
+});
+
+t('meeting prompt is dismissed automatically when the busy block ends', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar, shouldSuggestMeetingSwitch: () => true });
+  h.power.idleTime = 0;
+  calendar.setBusy({ startMs: 1000, endMs: 2000 });
+  h.advance(1000);
+  h.monitor.tick(); // opens the meeting prompt
+  assert.equal(h.meetingPrompts(), 1);
+  assert.equal(h.meetingDismissals(), 0);
+  h.advance(2000); // past the busy block
+  h.monitor.tick();
+  assert.equal(h.meetingDismissals(), 1);
+});
+
+t('meeting prompt is dismissed by a timer action (switch)', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10 }, { calendar, shouldSuggestMeetingSwitch: () => true });
+  h.power.idleTime = 0;
+  calendar.setBusy({ startMs: 1000, endMs: 60 * 60 * 1000 });
+  h.advance(1000);
+  h.monitor.tick();
+  assert.equal(h.meetingPrompts(), 1);
+  h.monitor.notifySwitch(false);
+  assert.equal(h.meetingDismissals(), 1);
+});
+
+t('empty calendarIcsUrl (no calendar dep): zero behaviour change — no meeting prompts, idle prompts as before', () => {
+  const h = makeHarness({ idlePromptMinutes: 10 }); // no calendar dep at all
+  h.power.idleTime = 600;
+  h.monitor.tick();
+  assert.equal(h.monitor.getState(), 'idle_prompt');
+  assert.equal(h.meetingPrompts(), 0);
+});
+
+t('lock/sleep that escalates an already-open idle prompt still pauses via handleAway; if the banked window overlapped a busy block, the banked prompt is flagged duringMeeting', () => {
+  const calendar = new FakeCalendar();
+  const h = makeHarness({ idlePromptMinutes: 10, idleResumeMode: 'prompt' }, { calendar });
+  h.power.idleTime = 600; // not busy yet — live idle prompt opens normally
+  h.monitor.tick();
+  assert.equal(h.monitor.getState(), 'idle_prompt');
+
+  // The busy block covers the whole banked window's midpoint (a meeting started during the idle stretch).
+  calendar.setBusy({ startMs: -1_000_000, endMs: 1_000_000 });
+
+  // Locked mid-prompt — escalates: freezes the banked window (unaffected by handleAway itself,
+  // which pauses unconditionally) and now stamps it duringMeeting from the busy check.
+  h.power.fire('lock-screen');
+  assert.equal(h.monitor.getState(), 'paused_away');
+  assert.equal(h.timer.status, 'paused');
+
+  h.advance(5 * 60 * 1000);
+  h.power.idleTime = 20;
+  h.monitor.tick();
+  h.power.idleTime = 0;
+  h.monitor.tick(); // resume detected, shows the banked prompt
+
+  assert.equal(h.openPrompts(), 1);
+  assert.equal(h.lastIdleDuringMeeting(), true);
 });
 
 console.log(`ok - ${passed} attention-monitor tests passed`);

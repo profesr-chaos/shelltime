@@ -3,6 +3,7 @@ import path from 'node:path';
 import * as db from './db';
 import { TimerEngine } from './timer';
 import { AttentionMonitor } from './attentionMonitor';
+import { CalendarMonitor } from './calendarMonitor';
 import { listCountries, listStates } from './holidays';
 import { logicalDayStr } from '../shared/logicalDay';
 import type { DayReview } from '../shared/types';
@@ -42,6 +43,18 @@ let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let timer: TimerEngine;
 let attention: AttentionMonitor;
+let calendar: CalendarMonitor;
+
+// True if the last project start/switch today is older than the configured suggest threshold —
+// AttentionMonitor stays db-free, so it calls back into this closure to decide.
+function shouldSuggestMeetingSwitch(): boolean {
+  const settings = db.getSettings();
+  if (!settings.calendarIcsUrl) return false;
+  const last = db.getLastSessionStart(todayStr());
+  if (!last) return true;
+  const ageMinutes = (Date.now() - new Date(last).getTime()) / 60_000;
+  return ageMinutes >= settings.meetingSwitchSuggestMinutes;
+}
 let overlaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
 // Main's own record of the overlay's intended size — passed explicitly on every setBounds call so
 // a frameless non-resizable window can't drift in size from DPI rounding while being dragged.
@@ -336,6 +349,7 @@ function registerIpc() {
       }
       if ('overlayOpacity' in patch) overlayWindow.setOpacity(updated.overlayOpacity);
     }
+    if ('calendarIcsUrl' in patch) calendar.refresh();
     broadcast('settings:changed', updated);
     return updated;
   });
@@ -413,6 +427,9 @@ function registerIpc() {
   });
   handle('timer:resolveResume', (_e, discard: boolean) => {
     attention.resolveResume(discard);
+  });
+  handle('timer:resolveMeeting', () => {
+    attention.resolveMeeting();
   });
 
   handle('dashboard:getMonthlySummary', (_e, month) => db.getMonthlySummary(month));
@@ -534,6 +551,9 @@ app.whenReady().then(() => {
     onUpdate: (state) => broadcast('timer:update', state),
   });
 
+  calendar = new CalendarMonitor(() => db.getSettings().calendarIcsUrl);
+  calendar.start();
+
   attention = new AttentionMonitor(
     timer,
     {
@@ -549,9 +569,19 @@ app.whenReady().then(() => {
       onResumeResolved: () => broadcast('resume:resolved'),
       onBreakPrompt: (minutesWorked) => broadcast('break:prompt', minutesWorked),
       onBreakDismissed: () => broadcast('break:dismissed'),
+      onMeetingPrompt: (payload) => {
+        showOverlayForPrompt();
+        broadcast('meeting:prompt', payload);
+      },
+      onMeetingDismissed: () => broadcast('meeting:dismissed'),
       onStateChange: () => broadcast('timer:update', timer.getState()),
     },
-    { getSettings: () => db.getSettings(), powerMonitor }
+    {
+      getSettings: () => db.getSettings(),
+      powerMonitor,
+      calendar: { isBusy: (at) => calendar.isBusy(at), currentBusyBlock: (at) => calendar.currentBusyBlock(at) },
+      shouldSuggestMeetingSwitch,
+    }
   );
 
   registerIpc();

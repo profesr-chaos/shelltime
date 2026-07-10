@@ -82,6 +82,8 @@ export interface Settings {
   hasCompletedSetup: boolean; // false until the user has reviewed the essential settings
   exportPrefix: string; // filename prefix for exports: <exportPrefix>_<date>
   userName: string; // shown in report headings: "<userName> - Monthly Report"
+  calendarIcsUrl: string; // published busy/free ICS feed URL; '' = calendar feature off
+  meetingSwitchSuggestMinutes: number; // suppress the meeting-switch prompt if the user switched within this many minutes
 }
 
 export const OVERLAY_OPACITY_FLOOR = 0.3;
@@ -99,6 +101,10 @@ export interface TimerState {
 
 export interface BreakPromptPayload {
   minutesWorked: number;
+}
+
+export interface MeetingPromptPayload {
+  projectId: number;
 }
 
 export interface DayReview {

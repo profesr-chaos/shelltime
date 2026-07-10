@@ -5,6 +5,7 @@ interface IdleInfo {
   projectId: number;
   idleSeconds: number;
   frozen: boolean; // true = a fixed, already-elapsed amount; false = still live/growing
+  duringMeeting: boolean; // the banked window overlapped a calendar busy block
 }
 
 // Prompts (from the main process) when a running timer has been idle past the threshold. Two

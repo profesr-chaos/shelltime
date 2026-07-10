@@ -39,6 +39,8 @@ const DEFAULT_SETTINGS: Settings = {
   hasCompletedSetup: false,
   exportPrefix: 'Shelltime',
   userName: 'Shelltime',
+  calendarIcsUrl: '',
+  meetingSwitchSuggestMinutes: 30,
 };
 
 export function clampOverlayOpacity(value: number): number {
@@ -801,6 +803,13 @@ export function listSessionsForDate(date: string): Session[] {
 export function getSessionById(id: number): Session | null {
   const row = db.prepare(`${SESSION_SELECT} WHERE s.id = ?`).get(id);
   return row ? rowToSession(row) : null;
+}
+
+/** Most recent project start/switch today — used to suppress the meeting-switch suggestion if the
+ * user already switched recently. */
+export function getLastSessionStart(date: string): string | null {
+  const row = db.prepare('SELECT MAX(started_at) as m FROM sessions WHERE date = ?').get(date) as { m: string | null };
+  return row.m;
 }
 
 export function insertSession(date: string, projectId: number, startedAt: string, endedAt: string): number {

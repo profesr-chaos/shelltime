@@ -215,6 +215,24 @@ export function Settings() {
         </FieldWrap>
       </Section>
 
+      <Section title="Calendar">
+        <FieldWrap label="Calendar URL" hint="Paste a published calendar URL (ICS). Only busy/free times are read — Shelltime never sees meeting titles.">
+          <TextInput
+            value={settings.calendarIcsUrl}
+            placeholder="https://..."
+            onChange={(e) => updateDebounced({ calendarIcsUrl: e.target.value })}
+          />
+        </FieldWrap>
+        <FieldWrap label="Suggest a switch if the last one was more than" tooltip="When a meeting starts, suggest switching projects only if you haven't switched more recently than this.">
+          <DurationInput
+            minutes={settings.meetingSwitchSuggestMinutes}
+            onChange={(minutes) => update({ meetingSwitchSuggestMinutes: Math.max(5, minutes) })}
+            minMinutes={5}
+            maxMinutes={4 * 60}
+          />
+        </FieldWrap>
+      </Section>
+
       <Section title="Overlay">
         <Toggle checked={settings.overlayAlwaysOnTop} onChange={(v) => update({ overlayAlwaysOnTop: v })} label="Always on top" />
         <Toggle checked={settings.overlayCompact} onChange={(v) => update({ overlayCompact: v })} label="Compact mode" />

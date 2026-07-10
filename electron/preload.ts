@@ -13,6 +13,7 @@ import type {
   LeaveSummary,
   Session,
   DayReview,
+  MeetingPromptPayload,
 } from '../shared/types';
 
 const api = {
@@ -131,8 +132,8 @@ const api = {
         ipcRenderer.removeListener('break:dismissed', listener);
       };
     },
-    onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number; frozen: boolean }) => void) => {
-      const listener = (_: unknown, data: { projectId: number; idleSeconds: number; frozen: boolean }) => cb(data);
+    onIdlePrompt: (cb: (data: { projectId: number; idleSeconds: number; frozen: boolean; duringMeeting: boolean }) => void) => {
+      const listener = (_: unknown, data: { projectId: number; idleSeconds: number; frozen: boolean; duringMeeting: boolean }) => cb(data);
       ipcRenderer.on('idle:prompt', listener);
       return () => {
         ipcRenderer.removeListener('idle:prompt', listener);
@@ -161,6 +162,21 @@ const api = {
       };
     },
     resolveResume: (discard: boolean): Promise<void> => ipcRenderer.invoke('timer:resolveResume', discard),
+    onMeetingPrompt: (cb: (data: MeetingPromptPayload) => void) => {
+      const listener = (_: unknown, data: MeetingPromptPayload) => cb(data);
+      ipcRenderer.on('meeting:prompt', listener);
+      return () => {
+        ipcRenderer.removeListener('meeting:prompt', listener);
+      };
+    },
+    onMeetingDismissed: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('meeting:dismissed', listener);
+      return () => {
+        ipcRenderer.removeListener('meeting:dismissed', listener);
+      };
+    },
+    resolveMeeting: (): Promise<void> => ipcRenderer.invoke('timer:resolveMeeting'),
   },
   dashboard: {
     getMonthlySummary: (month: string): Promise<MonthlySummary> => ipcRenderer.invoke('dashboard:getMonthlySummary', month),
