@@ -77,6 +77,7 @@ const api = {
   },
   day: {
     getFirstStart: (date: string): Promise<string | null> => ipcRenderer.invoke('day:getFirstStart', date),
+    isWorkingDay: (date: string): Promise<boolean> => ipcRenderer.invoke('day:isWorkingDay', date),
   },
   sessions: {
     list: (date: string): Promise<Session[]> => ipcRenderer.invoke('sessions:list', date),

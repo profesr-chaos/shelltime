@@ -39,10 +39,12 @@ export function Today() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [reassignSession, setReassignSession] = useState<Session | null>(null);
   const [dragFraction, setDragFraction] = useState<number | null>(null);
+  const [isWorkingDay, setIsWorkingDay] = useState(true);
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
     window.api.targets.getDailyStatus(date).then(setTarget);
+    window.api.day.isWorkingDay(date).then(setIsWorkingDay);
     window.api.notes.list(date).then((notes: Note[]) => {
       const map = new Map<number, number>();
       for (const n of notes) map.set(n.projectId, (map.get(n.projectId) ?? 0) + 1);
@@ -169,40 +171,48 @@ export function Today() {
         ) : (
           <StatCard label="Tracked" value={minutesToHhMm(trackedMinutes)} delta={trackedDeltaPct !== null ? `${trackedDeltaPct >= 0 ? '+' : ''}${trackedDeltaPct}%` : undefined} deltaTone={trackedDeltaPct !== null && trackedDeltaPct >= 0 ? 'good' : 'bad'} />
         )}
-        <StatCard label="Daily Target" value={minutesToHhMm(targetMinutes)} />
-        {liveDeltaMinutes !== null ? (
-          <StatCard
-            label="Remaining"
-            value={minutesToHhMm(Math.max(0, targetMinutes - (trackedMinutes + liveDeltaMinutes)))}
-            delta={signedMinutesToHhMm(-liveDeltaMinutes)}
-            deltaTone={-liveDeltaMinutes >= 0 ? 'good' : 'bad'}
-          />
+        {isWorkingDay ? (
+          <>
+            <StatCard label="Daily Target" value={minutesToHhMm(targetMinutes)} />
+            {liveDeltaMinutes !== null ? (
+              <StatCard
+                label="Remaining"
+                value={minutesToHhMm(Math.max(0, targetMinutes - (trackedMinutes + liveDeltaMinutes)))}
+                delta={signedMinutesToHhMm(-liveDeltaMinutes)}
+                deltaTone={-liveDeltaMinutes >= 0 ? 'good' : 'bad'}
+              />
+            ) : (
+              <StatCard label="Remaining" value={minutesToHhMm(remainingMinutes)} delta={remainingDeltaPct !== null ? `${remainingDeltaPct}%` : undefined} deltaTone={remainingMinutes <= 0 ? 'good' : 'bad'} />
+            )}
+          </>
         ) : (
-          <StatCard label="Remaining" value={minutesToHhMm(remainingMinutes)} delta={remainingDeltaPct !== null ? `${remainingDeltaPct}%` : undefined} deltaTone={remainingMinutes <= 0 ? 'good' : 'bad'} />
+          <StatCard label="Daily Target" value="—" delta="Non-working day" deltaTone="neutral" />
         )}
       </div>
 
-      <div className="mt-8 w-full">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium text-slate-700">
-            {minutesToHhMm(trackedMinutes)} / {minutesToHhMm(targetMinutes)}
-          </span>
-          <span className="text-slate-400">
-            {remainingMinutes <= 0 ? 'Target reached' : `${Math.round(pct * 100)}% · ${minutesToHhMm(remainingMinutes)} remaining`}
-          </span>
+      {isWorkingDay && (
+        <div className="mt-8 w-full">
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-700">
+              {minutesToHhMm(trackedMinutes)} / {minutesToHhMm(targetMinutes)}
+            </span>
+            <span className="text-slate-400">
+              {remainingMinutes <= 0 ? 'Target reached' : `${Math.round(pct * 100)}% · ${minutesToHhMm(remainingMinutes)} remaining`}
+            </span>
+          </div>
+          <div title="Drag the snail to reassign tracked time between projects">
+            <ProgressBar
+              fraction={pct}
+              tone="amber"
+              paused={timerState.status === 'paused'}
+              onSeek={handleSeek}
+              previewFraction={seekPreview}
+              dragLabel={dragLabel}
+              onDragChange={setDragFraction}
+            />
+          </div>
         </div>
-        <div title="Drag the snail to reassign tracked time between projects">
-          <ProgressBar
-            fraction={pct}
-            tone="amber"
-            paused={timerState.status === 'paused'}
-            onSeek={handleSeek}
-            previewFraction={seekPreview}
-            dragLabel={dragLabel}
-            onDragChange={setDragFraction}
-          />
-        </div>
-      </div>
+      )}
 
       <div className="mt-10">
         <div className="mb-4 flex items-center justify-between">

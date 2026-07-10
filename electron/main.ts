@@ -303,6 +303,7 @@ function registerIpc() {
   handle('targets:setMonthlyOverride', (_e, month, minutes) => db.setMonthlyTargetOverride(month, minutes));
 
   handle('day:getFirstStart', (_e, date) => db.getDayFirstStartedAt(date));
+  handle('day:isWorkingDay', (_e, date: string) => db.isWorkingDay(date));
 
   handle('sessions:list', (_e, date: string) => db.listSessionsForDate(date));
   handle('sessions:reallocate', (_e, sessionId: number, startIso: string, endIso: string, toProjectId: number) => {
