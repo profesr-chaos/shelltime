@@ -98,7 +98,6 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
             {showCategoryHeaders && (
               <button onClick={() => toggleCat(key)} className="flex w-full items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-2 text-left hover:bg-slate-100">
                 <ChevronRightIcon className={`text-slate-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} width={14} height={14} />
-                <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.category ?? 'Other'}</span>
                 <span className="text-[11px] font-medium tabular-nums text-slate-400">{g.items.length} · {minutesToHhMm(catMinutes)}</span>
               </button>

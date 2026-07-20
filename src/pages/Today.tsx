@@ -246,7 +246,6 @@ export function Today() {
               {showCategoryHeaders && (
                 <button onClick={() => toggleCat(key)} className="group flex items-center gap-2 px-1 pt-1 text-left">
                   <ChevronRightIcon className={`text-slate-300 transition-transform group-hover:text-slate-400 ${isCollapsed ? '' : 'rotate-90'}`} width={14} height={14} />
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{g.category ?? 'Other'}</span>
                   <span className="text-xs font-medium tabular-nums text-slate-300">{minutesToHhMm(catMinutes)}</span>
                   <span className="h-px flex-1 bg-slate-100" />

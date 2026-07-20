@@ -76,7 +76,6 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
           groups.map((g) => (
             <div key={g.category ?? '__other'} className="mb-1 last:mb-0">
               <div className="sticky top-0 flex items-center gap-2 bg-slate-50/95 px-3 py-1 backdrop-blur dark:bg-slate-900/80">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">{g.category ?? 'Other'}</span>
                 <span className="text-[10px] font-medium tabular-nums text-slate-300 dark:text-slate-600">{g.items.length}</span>
               </div>
