@@ -10,11 +10,14 @@ interface DistributeDeltaModalProps {
   date: string;
   projects: Project[];
   deltaMinutes: number;
+  // When provided, the chosen split is handed back instead of being written straight to the DB —
+  // lets a staged editor (Edit Timings) apply the delta to its in-progress rows.
+  onApply?: (selectedIds: number[], deltaMinutes: number) => void | Promise<void>;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function DistributeDeltaModal({ date, projects, deltaMinutes, onClose, onSaved }: DistributeDeltaModalProps) {
+export function DistributeDeltaModal({ date, projects, deltaMinutes, onApply, onClose, onSaved }: DistributeDeltaModalProps) {
   const active = projects.filter((p) => p.isActive);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [minutesByProject, setMinutesByProject] = useState<Map<number, number>>(new Map());
@@ -39,9 +42,13 @@ export function DistributeDeltaModal({ date, projects, deltaMinutes, onClose, on
   const confirm = async () => {
     if (selectedIds.size === 0) return;
     setSaving(true);
-    await window.api.entries.applyDelta(date, [...selectedIds], deltaMinutes);
+    if (onApply) {
+      await onApply([...selectedIds], deltaMinutes);
+    } else {
+      await window.api.entries.applyDelta(date, [...selectedIds], deltaMinutes);
+      toast('Time reassigned');
+    }
     setSaving(false);
-    toast('Time reassigned');
     onSaved();
     onClose();
   };

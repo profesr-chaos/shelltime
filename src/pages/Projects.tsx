@@ -210,12 +210,14 @@ function ProjectRow({ project, hours, comments, onEdit, onContextMenu }: { proje
         <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700">Comments</h3>
-            <Select value={month} onChange={(e) => setMonth(e.target.value)} className="w-48">
-              <option value="all">All dates</option>
-              {months.map((m) => (
-                <option key={m} value={m}>{formatMonth(m)}</option>
-              ))}
-            </Select>
+            <div className="w-44">
+              <Select value={month} onChange={(e) => setMonth(e.target.value)}>
+                <option value="all">All dates</option>
+                {months.map((m) => (
+                  <option key={m} value={m}>{formatMonth(m)}</option>
+                ))}
+              </Select>
+            </div>
           </div>
           {!history && <p className="text-sm text-slate-400">Loading…</p>}
           {history && notes.length === 0 && <p className="text-sm text-slate-400">No comments for this period.</p>}
