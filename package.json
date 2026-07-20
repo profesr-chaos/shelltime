@@ -33,6 +33,7 @@
       "icon": "resources/icon.png"
     },
     "nsis": {
+      "runAfterFinish": false,
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
