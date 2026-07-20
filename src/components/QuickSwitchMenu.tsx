@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Project } from '@shared/types';
+import { groupByCategory } from '@/lib/projects';
 import { ColorDot } from './ui/Badge';
 
 interface QuickSwitchMenuProps {
@@ -33,10 +34,10 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
   // Recent-only view is only worth it when it actually shortens the list.
   const showRecentView = !showAll && recent.length > 0 && recent.length < active.length;
 
-  // Full view groups by category (alphabetical, uncategorised last); skip headers entirely when
-  // no project has a category.
-  const categories = [...new Set(active.map((p) => p.category).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b));
-  const uncategorised = active.filter((p) => !p.category);
+  // Full view groups by category (alphabetical, uncategorised last). Suppress headers entirely when
+  // nothing is categorised, so a category-free setup looks exactly as it did before.
+  const groups = groupByCategory(active, (p) => p.category);
+  const hasCategories = groups.some((g) => g.category !== null);
 
   const row = (p: Project) => (
     <button
@@ -71,19 +72,19 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
               More +
             </button>
           </>
-        ) : (
-          <>
-            {categories.map((cat) => (
-              <div key={cat}>
-                <p className="px-3 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500">{cat}</p>
-                {active.filter((p) => p.category === cat).map(row)}
+        ) : hasCategories ? (
+          groups.map((g) => (
+            <div key={g.category ?? '__other'} className="mb-1 last:mb-0">
+              <div className="sticky top-0 flex items-center gap-2 bg-slate-50/95 px-3 py-1 backdrop-blur dark:bg-slate-900/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">{g.category ?? 'Other'}</span>
+                <span className="text-[10px] font-medium tabular-nums text-slate-300 dark:text-slate-600">{g.items.length}</span>
               </div>
-            ))}
-            {categories.length > 0 && uncategorised.length > 0 && (
-              <p className="px-3 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-500">Other</p>
-            )}
-            {uncategorised.map(row)}
-          </>
+              {g.items.map(row)}
+            </div>
+          ))
+        ) : (
+          active.map(row)
         )}
         {active.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">No active projects</p>}
       </div>

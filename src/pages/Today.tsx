@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { DailyEntry, DailyTargetStatus, Note, Project, Session } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
 import { useTimer } from '@/hooks/useTimer';
+import { groupByCategory } from '@/lib/projects';
 import { todayIso, formatMonthDay, workdayNumberOfYear, minutesToHhMm, secondsToHms, formatClockTime, signedMinutesToHhMm } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -97,6 +98,11 @@ export function Today() {
     if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     return a.project.code.localeCompare(b.project.code);
   });
+
+  // Group under category headers (rows stay time-sorted within each group). No headers when nothing
+  // is categorised, so an uncategorised setup renders as the plain sorted list it always did.
+  const groups = groupByCategory(rows, (r) => r.project.category);
+  const showCategoryHeaders = groups.some((g) => g.category !== null);
 
   const trackedDeltaPct = yesterdayMinutes > 0 ? Math.round(((trackedMinutes - yesterdayMinutes) / yesterdayMinutes) * 100) : null;
   const remainingDeltaPct = targetMinutes > 0 ? -Math.round((remainingMinutes / targetMinutes) * 100) : null;
@@ -223,57 +229,68 @@ export function Today() {
         </div>
         <div className="flex flex-col gap-3">
           {rows.length === 0 && <p className="text-sm text-slate-400">No active projects yet - add one from the Projects page.</p>}
-          {rows.map(({ project, isActive, minutes }) => {
-            const noteCount = notesByProject.get(project.id) ?? 0;
-            const entry = entries.find((e) => e.projectId === project.id);
-            return (
-              <div
-                key={project.id}
-                className={`flex items-center justify-between rounded-xl border px-5 py-4 transition-colors ${
-                  isActive ? 'border-amber bg-amber-50/60' : 'border-slate-200 bg-white'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ColorDot color={project.color} />
-                  <div>
-                    <p className="font-bold text-slate-900">{project.code}</p>
-                    <p className="text-sm text-slate-500">{project.name}</p>
-                  </div>
+          {groups.map((g) => (
+            <div key={g.category ?? '__other'} className="flex flex-col gap-3">
+              {showCategoryHeaders && (
+                <div className="flex items-center gap-2 px-1 pt-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{g.category ?? 'Other'}</span>
+                  <span className="h-px flex-1 bg-slate-100" />
                 </div>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setNotesFor({ date, project })}
-                    className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm hover:bg-slate-100 ${
-                      noteCount > 0 ? 'font-bold text-amber' : 'text-slate-400 hover:text-slate-600'
+              )}
+              {g.items.map(({ project, isActive, minutes }) => {
+                const noteCount = notesByProject.get(project.id) ?? 0;
+                const entry = entries.find((e) => e.projectId === project.id);
+                return (
+                  <div
+                    key={project.id}
+                    className={`flex items-center justify-between rounded-xl border px-5 py-4 transition-colors ${
+                      isActive ? 'border-amber bg-amber-50/60' : 'border-slate-200 bg-white'
                     }`}
-                    title="View / add notes"
                   >
-                    💬 {noteCount > 0 ? noteCount : ''}
-                  </button>
-                  <span className={`font-mono text-lg tabular-nums ${isActive ? 'font-bold text-amber' : 'text-slate-700'}`}>
-                    {secondsToHms(minutes * 60)}
-                  </span>
-                  {isToday && !isActive && (
-                    <IconButton
-                      label="Start timing this project"
-                      variant="primary"
-                      onClick={() => (timerState.activeProjectId === null ? start(project.id) : switchProject(project.id))}
-                      className="h-8 w-8"
-                    >
-                      <PlayIcon width={14} height={14} />
-                    </IconButton>
-                  )}
-                  <IconButton
-                    label="Edit time"
-                    onClick={() => setEditEntry(entry ?? { id: 0, date, projectId: project.id, durationMinutes: 0, source: 'manual', createdAt: '', updatedAt: '', project })}
-                    className="h-8 w-8"
-                  >
-                    <PencilIcon width={16} height={16} />
-                  </IconButton>
-                </div>
-              </div>
-            );
-          })}
+                    <div className="flex items-center gap-3">
+                      <ColorDot color={project.color} />
+                      <div>
+                        <p className="font-bold text-slate-900">{project.code}</p>
+                        <p className="text-sm text-slate-500">{project.name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => setNotesFor({ date, project })}
+                        className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm hover:bg-slate-100 ${
+                          noteCount > 0 ? 'font-bold text-amber' : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                        title="View / add notes"
+                      >
+                        💬 {noteCount > 0 ? noteCount : ''}
+                      </button>
+                      <span className={`font-mono text-lg tabular-nums ${isActive ? 'font-bold text-amber' : 'text-slate-700'}`}>
+                        {secondsToHms(minutes * 60)}
+                      </span>
+                      {isToday && !isActive && (
+                        <IconButton
+                          label="Start timing this project"
+                          variant="primary"
+                          onClick={() => (timerState.activeProjectId === null ? start(project.id) : switchProject(project.id))}
+                          className="h-8 w-8"
+                        >
+                          <PlayIcon width={14} height={14} />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        label="Edit time"
+                        onClick={() => setEditEntry(entry ?? { id: 0, date, projectId: project.id, durationMinutes: 0, source: 'manual', createdAt: '', updatedAt: '', project })}
+                        className="h-8 w-8"
+                      >
+                        <PencilIcon width={16} height={16} />
+                      </IconButton>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 

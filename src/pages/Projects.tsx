@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Project, ProjectHistory } from '@shared/types';
 import { useProjects } from '@/hooks/useProjects';
+import { groupByCategory } from '@/lib/projects';
 import { currentMonthStr, minutesToHhMm, formatDateShort, formatMonth } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { ColorDot } from '@/components/ui/Badge';
@@ -49,6 +50,12 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   );
   const active = filtered.filter((p) => p.isActive);
   const inactive = filtered.filter((p) => !p.isActive);
+  const activeGroups = groupByCategory([...active].sort((a, b) => a.code.localeCompare(b.code)), (p) => p.category);
+  const showCategoryHeaders = activeGroups.some((g) => g.category !== null);
+  const openContextMenu = (e: React.MouseEvent, project: Project) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, project });
+  };
 
   return (
     <div>
@@ -71,8 +78,19 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
           <span className="text-right">Comments MTD</span>
           <span className="text-right">Hours MTD</span>
         </div>
-        {active.map((p) => (
-          <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, project: p }); }} />
+        {activeGroups.map((g) => (
+          <div key={g.category ?? '__other'}>
+            {showCategoryHeaders && (
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.category ?? 'Other'}</span>
+                <span className="text-[11px] font-medium tabular-nums text-slate-300">{g.items.length}</span>
+              </div>
+            )}
+            {g.items.map((p) => (
+              <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} onContextMenu={(e) => openContextMenu(e, p)} />
+            ))}
+          </div>
         ))}
         {active.length === 0 && <p className="px-6 py-6 text-sm text-slate-400">No projects yet - add one to get started.</p>}
 
