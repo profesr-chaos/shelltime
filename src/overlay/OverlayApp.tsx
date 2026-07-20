@@ -27,6 +27,7 @@ export function OverlayApp() {
   const [compact, setCompact] = useState(true);
   const [dark, setDark] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [finishPickOpen, setFinishPickOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const wasCompactBeforeBreak = useRef(false);
 
@@ -75,24 +76,17 @@ export function OverlayApp() {
   // Persist the theme; the settings:changed broadcast updates `dark` (here and in the main window).
   const toggleDark = () => window.api.settings.update({ overlayDark: !dark });
 
-  // Compact mode is a 32px-tall window, too short for a dropdown — grow it while the switch menu is open, then restore.
-  const COMPACT_MENU_HEIGHT = 320;
-  const openCompactSwitch = () => {
-    setSwitchOpen(true);
-    window.api.overlay.setHeight(COMPACT_MENU_HEIGHT);
-  };
-  const closeCompactSwitch = () => {
-    setSwitchOpen(false);
-    window.api.overlay.setHeight(32);
-  };
-
-  // QuickSwitchMenu closes on clicks inside the overlay; also close (and shrink) when the
-  // overlay loses focus, i.e. the user clicks another window entirely.
+  // QuickSwitchMenu closes on clicks inside the overlay; also close (and shrink the window back)
+  // when the overlay loses focus, i.e. the user clicks another window entirely.
   useEffect(() => {
-    if (!switchOpen || !compact) return;
-    window.addEventListener('blur', closeCompactSwitch);
-    return () => window.removeEventListener('blur', closeCompactSwitch);
-  }, [switchOpen, compact]);
+    if (!switchOpen && !finishPickOpen) return;
+    const close = () => {
+      setSwitchOpen(false);
+      setFinishPickOpen(false);
+    };
+    window.addEventListener('blur', close);
+    return () => window.removeEventListener('blur', close);
+  }, [switchOpen, finishPickOpen]);
 
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
@@ -103,14 +97,18 @@ export function OverlayApp() {
   // extra room below the normal widget), or the plain compact/expanded widget.
   const onResume = resumePrompt.projectId !== null;
 
+  // The overlay window is normally shorter than an open dropdown, which clips its first/last
+  // rows — grow the window while a menu is open, shrink it back on close.
+  const menuOpen = switchOpen || finishPickOpen;
   useEffect(() => {
     if (review) window.api.overlay.setHeight(300);
     else if (onResume) window.api.overlay.setHeight(250);
     else if (idle) window.api.overlay.setHeight(210);
-    else if (meetingPrompt.projectId !== null) window.api.overlay.setHeight(280);
+    else if (meetingPrompt.projectId !== null) window.api.overlay.setHeight(390);
     else if (onBreak) window.api.overlay.setHeight(390);
-    else window.api.overlay.setHeight(compact ? 32 : 240);
-  }, [review, idle, onResume, meetingPrompt.projectId, onBreak, compact]);
+    else if (compact) window.api.overlay.setHeight(switchOpen ? 320 : 32);
+    else window.api.overlay.setHeight(menuOpen ? 540 : 240);
+  }, [review, idle, onResume, meetingPrompt.projectId, onBreak, compact, switchOpen, menuOpen]);
 
   if (review) {
     const delta = review.totalMinutes - review.targetMinutes;
@@ -263,7 +261,7 @@ export function OverlayApp() {
       <div {...drag} className="flex h-8 w-full select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <button
             className="no-drag flex flex-1 items-center gap-2 overflow-hidden"
-            onClick={() => (switchOpen ? closeCompactSwitch() : openCompactSwitch())}
+            onClick={() => setSwitchOpen((v) => !v)}
           >
             {project ? (
               <>
@@ -298,7 +296,7 @@ export function OverlayApp() {
             projects={projects}
             activeProjectId={state.activeProjectId}
             onSelect={selectProject}
-            onClose={closeCompactSwitch}
+            onClose={() => setSwitchOpen(false)}
             anchorClassName="top-12 left-0"
           />
         )}
@@ -368,7 +366,7 @@ export function OverlayApp() {
                 activeProjectId={state.activeProjectId}
                 onSelect={selectProject}
                 onClose={() => setSwitchOpen(false)}
-                anchorClassName="bottom-10 left-0"
+                anchorClassName="top-10 left-0"
               />
             )}
           </div>
@@ -383,7 +381,8 @@ export function OverlayApp() {
           onResume={start}
           disabled={onBreak}
           bordered={false}
-          menuAnchorClassName="bottom-10 left-0"
+          menuAnchorClassName="top-8 left-0"
+          onPickOpenChange={setFinishPickOpen}
           className="mt-3"
         />
       </div>

@@ -11,6 +11,7 @@ interface FinishedForTodayProps {
   disabled?: boolean;
   bordered?: boolean;
   menuAnchorClassName?: string;
+  onPickOpenChange?: (open: boolean) => void; // lets the overlay grow its window while the menu is open
   className?: string;
 }
 
@@ -25,9 +26,14 @@ export function FinishedForToday({
   disabled = false,
   bordered = true,
   menuAnchorClassName = 'top-9 right-0',
+  onPickOpenChange,
   className = '',
 }: FinishedForTodayProps) {
-  const [pickOpen, setPickOpen] = useState(false);
+  const [pickOpen, setPickOpenState] = useState(false);
+  const setPickOpen = (open: boolean) => {
+    setPickOpenState(open);
+    onPickOpenChange?.(open);
+  };
 
   return (
     <div className={`relative ${className}`}>
@@ -58,7 +64,10 @@ export function FinishedForToday({
         <QuickSwitchMenu
           projects={projects}
           activeProjectId={null}
-          onSelect={(id) => onResume(id)}
+          onSelect={(id) => {
+            setPickOpen(false);
+            onResume(id);
+          }}
           onClose={() => setPickOpen(false)}
           anchorClassName={menuAnchorClassName}
           heading="Resume on"
