@@ -218,7 +218,7 @@ export function Today() {
             <ProgressBar
               fraction={pct}
               tone="amber"
-              paused={timerState.status === 'paused'}
+              paused={!isToday || timerState.status !== 'running'}
               onSeek={handleSeek}
               previewFraction={seekPreview}
               dragLabel={dragLabel}

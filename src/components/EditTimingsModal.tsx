@@ -139,7 +139,7 @@ export function EditTimingsModal({ date, projects, onClose, onSaved }: EditTimin
           <span className="font-semibold text-slate-500">{minutesToHhMm(targetMinutes)}</span> target
         </p>
         <div className="mt-2">
-          <ProgressBar fraction={targetMinutes > 0 ? trackedMinutes / targetMinutes : 0} tone={underBy > 0.5 ? 'red' : 'amber'} onSeek={handleSeek} />
+          <ProgressBar fraction={targetMinutes > 0 ? trackedMinutes / targetMinutes : 0} tone={underBy > 0.5 ? 'red' : 'amber'} paused onSeek={handleSeek} />
         </div>
         {underBy > 0.5 && (
           <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-amber-600">
