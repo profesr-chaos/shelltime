@@ -16,6 +16,7 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   const [commentsByProject, setCommentsByProject] = useState<Map<number, number>>(new Map());
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
 
   useEffect(() => {
@@ -50,12 +51,22 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   );
   const active = filtered.filter((p) => p.isActive);
   const inactive = filtered.filter((p) => !p.isActive);
-  const activeGroups = groupByCategory([...active].sort((a, b) => a.code.localeCompare(b.code)), (p) => p.category);
+  const activeGroups = groupByCategory(
+    [...active].sort((a, b) => a.code.localeCompare(b.code)),
+    (p) => p.category,
+    (p) => hoursByProject.get(p.id) ?? 0
+  );
   const showCategoryHeaders = activeGroups.some((g) => g.category !== null);
   const openContextMenu = (e: React.MouseEvent, project: Project) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, project });
   };
+  const toggleCat = (key: string) =>
+    setCollapsedCats((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   return (
     <div>
@@ -78,20 +89,26 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
           <span className="text-right">Comments MTD</span>
           <span className="text-right">Hours MTD</span>
         </div>
-        {activeGroups.map((g) => (
-          <div key={g.category ?? '__other'}>
+        {activeGroups.map((g) => {
+          const key = g.category ?? '__other';
+          const isCollapsed = collapsedCats.has(key);
+          const catMinutes = g.items.reduce((s, p) => s + (hoursByProject.get(p.id) ?? 0), 0);
+          return (
+          <div key={key}>
             {showCategoryHeaders && (
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-2">
+              <button onClick={() => toggleCat(key)} className="flex w-full items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-6 py-2 text-left hover:bg-slate-100">
+                <ChevronRightIcon className={`text-slate-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} width={14} height={14} />
                 <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{g.category ?? 'Other'}</span>
-                <span className="text-[11px] font-medium tabular-nums text-slate-300">{g.items.length}</span>
-              </div>
+                <span className="text-[11px] font-medium tabular-nums text-slate-400">{g.items.length} · {minutesToHhMm(catMinutes)}</span>
+              </button>
             )}
-            {g.items.map((p) => (
+            {!isCollapsed && g.items.map((p) => (
               <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} onContextMenu={(e) => openContextMenu(e, p)} />
             ))}
           </div>
-        ))}
+          );
+        })}
         {active.length === 0 && <p className="px-6 py-6 text-sm text-slate-400">No projects yet - add one to get started.</p>}
 
         {inactive.length > 0 && (
@@ -185,10 +202,7 @@ function ProjectRow({ project, hours, comments, onEdit, onContextMenu }: { proje
         <button onClick={onEdit} className="flex items-center gap-2 text-left text-xs font-semibold text-slate-400">
           <ColorDot color={project.color} /> {project.code}
         </button>
-        <button onClick={onEdit} className="text-left font-semibold text-slate-900">
-          {project.name}
-          {project.category && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{project.category}</span>}
-        </button>
+        <button onClick={onEdit} className="text-left font-semibold text-slate-900">{project.name}</button>
         <span className="text-right font-medium text-slate-700">{comments}</span>
         <span className="text-right font-medium text-slate-700">{minutesToHhMm(hours)}</span>
       </div>

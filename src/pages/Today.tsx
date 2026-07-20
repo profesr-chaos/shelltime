@@ -41,6 +41,13 @@ export function Today() {
   const [reassignSession, setReassignSession] = useState<Session | null>(null);
   const [dragFraction, setDragFraction] = useState<number | null>(null);
   const [isWorkingDay, setIsWorkingDay] = useState(true);
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  const toggleCat = (key: string) =>
+    setCollapsedCats((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const load = useCallback(() => {
     window.api.entries.getDaily(date).then(setEntries);
@@ -99,9 +106,10 @@ export function Today() {
     return a.project.code.localeCompare(b.project.code);
   });
 
-  // Group under category headers (rows stay time-sorted within each group). No headers when nothing
-  // is categorised, so an uncategorised setup renders as the plain sorted list it always did.
-  const groups = groupByCategory(rows, (r) => r.project.category);
+  // Group under category headers (rows stay time-sorted within each group; categories ranked by the
+  // hours worked within them). No headers when nothing is categorised, so an uncategorised setup
+  // renders as the plain sorted list it always did.
+  const groups = groupByCategory(rows, (r) => r.project.category, (r) => r.minutes);
   const showCategoryHeaders = groups.some((g) => g.category !== null);
 
   const trackedDeltaPct = yesterdayMinutes > 0 ? Math.round(((trackedMinutes - yesterdayMinutes) / yesterdayMinutes) * 100) : null;
@@ -229,16 +237,22 @@ export function Today() {
         </div>
         <div className="flex flex-col gap-3">
           {rows.length === 0 && <p className="text-sm text-slate-400">No active projects yet - add one from the Projects page.</p>}
-          {groups.map((g) => (
-            <div key={g.category ?? '__other'} className="flex flex-col gap-3">
+          {groups.map((g) => {
+            const key = g.category ?? '__other';
+            const isCollapsed = collapsedCats.has(key);
+            const catMinutes = g.items.reduce((s, r) => s + r.minutes, 0);
+            return (
+            <div key={key} className="flex flex-col gap-3">
               {showCategoryHeaders && (
-                <div className="flex items-center gap-2 px-1 pt-1">
+                <button onClick={() => toggleCat(key)} className="group flex items-center gap-2 px-1 pt-1 text-left">
+                  <ChevronRightIcon className={`text-slate-300 transition-transform group-hover:text-slate-400 ${isCollapsed ? '' : 'rotate-90'}`} width={14} height={14} />
                   <span className="h-1.5 w-1.5 rounded-full bg-amber/70" />
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{g.category ?? 'Other'}</span>
+                  <span className="text-xs font-medium tabular-nums text-slate-300">{minutesToHhMm(catMinutes)}</span>
                   <span className="h-px flex-1 bg-slate-100" />
-                </div>
+                </button>
               )}
-              {g.items.map(({ project, isActive, minutes }) => {
+              {!isCollapsed && g.items.map(({ project, isActive, minutes }) => {
                 const noteCount = notesByProject.get(project.id) ?? 0;
                 const entry = entries.find((e) => e.projectId === project.id);
                 return (
@@ -290,7 +304,8 @@ export function Today() {
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
