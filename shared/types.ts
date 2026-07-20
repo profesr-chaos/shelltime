@@ -4,6 +4,7 @@ export interface Project {
   name: string;
   color: string;
   description: string | null;
+  category: string | null; // free-text grouping, e.g. customer name
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

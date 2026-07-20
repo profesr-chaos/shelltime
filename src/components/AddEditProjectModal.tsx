@@ -9,14 +9,16 @@ const PRESET_COLORS = ['#F5941E', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6', '#
 
 interface AddEditProjectModalProps {
   project?: Project;
+  categories?: string[]; // existing categories, offered as suggestions
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function AddEditProjectModal({ project, onClose, onSaved }: AddEditProjectModalProps) {
+export function AddEditProjectModal({ project, categories = [], onClose, onSaved }: AddEditProjectModalProps) {
   const [code, setCode] = useState(project?.code ?? '');
   const [name, setName] = useState(project?.name ?? '');
   const [description, setDescription] = useState(project?.description ?? '');
+  const [category, setCategory] = useState(project?.category ?? '');
   const [color, setColor] = useState(project?.color ?? PRESET_COLORS[0]);
   const [isActive, setIsActive] = useState(project?.isActive ?? true);
   const [saving, setSaving] = useState(false);
@@ -29,9 +31,9 @@ export function AddEditProjectModal({ project, onClose, onSaved }: AddEditProjec
     if (!valid) return;
     setSaving(true);
     if (project) {
-      await window.api.projects.update(project.id, { code: code.trim(), name: name.trim(), description: description.trim() || null, color, isActive });
+      await window.api.projects.update(project.id, { code: code.trim(), name: name.trim(), description: description.trim() || null, category: category.trim() || null, color, isActive });
     } else {
-      await window.api.projects.create({ code: code.trim(), name: name.trim(), description: description.trim() || undefined, color });
+      await window.api.projects.create({ code: code.trim(), name: name.trim(), description: description.trim() || undefined, category: category.trim() || undefined, color });
     }
     setSaving(false);
     toast(project ? 'Project updated' : 'Project created');
@@ -95,6 +97,14 @@ export function AddEditProjectModal({ project, onClose, onSaved }: AddEditProjec
         </FieldWrap>
         <FieldWrap label="Description" hint="Optional">
           <Textarea rows={2} value={description ?? ''} onChange={(e) => setDescription(e.target.value)} />
+        </FieldWrap>
+        <FieldWrap label="Category" hint="Optional - e.g. customer; groups projects in the switch menu">
+          <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Acme Corp" list="project-categories" />
+          <datalist id="project-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </FieldWrap>
         <FieldWrap label="Colour">
           <div className="flex gap-2">

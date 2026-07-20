@@ -134,7 +134,7 @@ export function initDb(userDataDir: string) {
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [
@@ -185,6 +185,8 @@ function runMigrations() {
     // migrations[5]: v5 -> v6 — sessions table added above via CREATE TABLE IF NOT EXISTS; nothing
     // to migrate, this entry just keeps the version counter in sync.
     () => {},
+    // migrations[6]: v6 -> v7 — project categories (free-text grouping, e.g. customer)
+    () => db.exec('ALTER TABLE projects ADD COLUMN category TEXT'),
   ];
   for (let v = current; v < SCHEMA_VERSION; v++) migrations[v]?.();
   if (current < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -277,6 +279,7 @@ function rowToProject(row: any): Project {
     name: row.name,
     color: row.color,
     description: row.description,
+    category: row.category ?? null,
     isActive: !!row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -305,28 +308,50 @@ export function createProject(input: {
   name: string;
   color?: string;
   description?: string;
+  category?: string;
 }): Project {
   const ts = now();
   const color = input.color || nextColor();
   const result = db
     .prepare(
-      'INSERT INTO projects (code, name, color, description, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)'
+      'INSERT INTO projects (code, name, color, description, category, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)'
     )
-    .run(input.code.trim(), input.name.trim(), color, input.description ?? null, ts, ts);
+    .run(input.code.trim(), input.name.trim(), color, input.description ?? null, input.category?.trim() || null, ts, ts);
   return getProject(result.lastInsertRowid as number)!;
 }
 
 export function updateProject(
   id: number,
-  patch: Partial<Pick<Project, 'code' | 'name' | 'color' | 'description' | 'isActive'>>
+  patch: Partial<Pick<Project, 'code' | 'name' | 'color' | 'description' | 'category' | 'isActive'>>
 ): Project {
   const current = getProject(id);
   if (!current) throw new Error('Project not found');
   const merged = { ...current, ...patch };
   db.prepare(
-    'UPDATE projects SET code = ?, name = ?, color = ?, description = ?, is_active = ?, updated_at = ? WHERE id = ?'
-  ).run(merged.code, merged.name, merged.color, merged.description, merged.isActive ? 1 : 0, now(), id);
+    'UPDATE projects SET code = ?, name = ?, color = ?, description = ?, category = ?, is_active = ?, updated_at = ? WHERE id = ?'
+  ).run(merged.code, merged.name, merged.color, merged.description, merged.category?.trim() || null, merged.isActive ? 1 : 0, now(), id);
   return getProject(id)!;
+}
+
+// Projects with tracked time in the last `workingDays` working days (including today) — powers the
+// "recent" shortlist in the quick-switch menu.
+export function listRecentProjectIds(workingDays = 7): number[] {
+  const cursor = new Date();
+  let counted = 0;
+  let cutoff = '';
+  // Bounded walk-back: 4x window covers weekends/bank holidays without risking a long loop.
+  for (let i = 0; counted < workingDays && i < workingDays * 4; i++) {
+    const ds = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    if (isWorkingDay(ds)) {
+      counted++;
+      cutoff = ds;
+    }
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  const rows = db
+    .prepare('SELECT DISTINCT project_id FROM daily_project_time WHERE date >= ? AND duration_minutes > 0')
+    .all(cutoff) as { project_id: number }[];
+  return rows.map((r) => r.project_id);
 }
 
 export function setProjectActive(id: number, isActive: boolean): Project {
@@ -450,7 +475,7 @@ function rowToEntry(row: any): DailyEntry {
 
 const ENTRY_SELECT = `
   SELECT dpt.*, p.code as p_code, p.name as p_name, p.color as p_color,
-         p.description as p_description, p.is_active as p_is_active,
+         p.description as p_description, p.category as p_category, p.is_active as p_is_active,
          p.created_at as p_created_at, p.updated_at as p_updated_at
   FROM daily_project_time dpt
   JOIN projects p ON p.id = dpt.project_id
@@ -471,6 +496,7 @@ function mapEntryRow(row: any): DailyEntry {
       name: row.p_name,
       color: row.p_color,
       description: row.p_description,
+      category: row.p_category ?? null,
       isActive: !!row.p_is_active,
       createdAt: row.p_created_at,
       updatedAt: row.p_updated_at,
@@ -572,7 +598,7 @@ export function listNotesForMonth(month: string): (Note & { project: Project })[
   const rows = db
     .prepare(
       `SELECT n.*, p.code as p_code, p.name as p_name, p.color as p_color, p.description as p_description,
-              p.is_active as p_is_active, p.created_at as p_created_at, p.updated_at as p_updated_at
+              p.category as p_category, p.is_active as p_is_active, p.created_at as p_created_at, p.updated_at as p_updated_at
        FROM notes n JOIN projects p ON p.id = n.project_id
        WHERE n.date LIKE ? ORDER BY n.date ASC, n.created_at ASC`
     )
@@ -590,6 +616,7 @@ export function listNotesForMonth(month: string): (Note & { project: Project })[
       name: row.p_name,
       color: row.p_color,
       description: row.p_description,
+      category: row.p_category ?? null,
       isActive: !!row.p_is_active,
       createdAt: row.p_created_at,
       updatedAt: row.p_updated_at,
@@ -782,6 +809,7 @@ function rowToSession(row: any): Session {
       name: row.p_name,
       color: row.p_color,
       description: row.p_description,
+      category: row.p_category ?? null,
       isActive: !!row.p_is_active,
       createdAt: row.p_created_at,
       updatedAt: row.p_updated_at,
@@ -791,7 +819,7 @@ function rowToSession(row: any): Session {
 
 const SESSION_SELECT = `
   SELECT s.*, p.code as p_code, p.name as p_name, p.color as p_color, p.description as p_description,
-         p.is_active as p_is_active, p.created_at as p_created_at, p.updated_at as p_updated_at
+         p.category as p_category, p.is_active as p_is_active, p.created_at as p_created_at, p.updated_at as p_updated_at
   FROM sessions s JOIN projects p ON p.id = s.project_id
 `;
 

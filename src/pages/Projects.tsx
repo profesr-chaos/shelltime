@@ -15,6 +15,18 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   const [commentsByProject, setCommentsByProject] = useState<Map<number, number>>(new Map());
   const [editing, setEditing] = useState<Project | 'new' | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('blur', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('blur', close);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     window.api.dashboard.getMonthlySummary(currentMonthStr()).then((summary) => {
@@ -60,7 +72,7 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
           <span className="text-right">Hours MTD</span>
         </div>
         {active.map((p) => (
-          <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} />
+          <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, project: p }); }} />
         ))}
         {active.length === 0 && <p className="px-6 py-6 text-sm text-slate-400">No projects yet - add one to get started.</p>}
 
@@ -74,15 +86,44 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
               Inactive Projects ({inactive.length})
             </button>
             {showInactive && inactive.map((p) => (
-              <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} />
+              <ProjectRow key={p.id} project={p} hours={hoursByProject.get(p.id) ?? 0} comments={commentsByProject.get(p.id) ?? 0} onEdit={() => setEditing(p)} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, project: p }); }} />
             ))}
           </div>
         )}
       </div>
 
+      {contextMenu && (
+        <div
+          className="fixed z-50 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+            onClick={() => {
+              setEditing(contextMenu.project);
+              setContextMenu(null);
+            }}
+          >
+            Edit project
+          </button>
+          <button
+            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+            onClick={async () => {
+              await window.api.projects.setActive(contextMenu.project.id, !contextMenu.project.isActive);
+              setContextMenu(null);
+              refreshAll();
+            }}
+          >
+            {contextMenu.project.isActive ? 'Archive project' : 'Restore project'}
+          </button>
+        </div>
+      )}
+
       {editing && (
         <AddEditProjectModal
           project={editing === 'new' ? undefined : editing}
+          categories={[...new Set(projects.map((p) => p.category).filter((c): c is string => !!c))].sort()}
           onClose={() => setEditing(null)}
           onSaved={refreshAll}
         />
@@ -91,7 +132,7 @@ export function Projects({ onProjectsChanged }: { onProjectsChanged?: () => void
   );
 }
 
-function ProjectRow({ project, hours, comments, onEdit }: { project: Project; hours: number; comments: number; onEdit: () => void }) {
+function ProjectRow({ project, hours, comments, onEdit, onContextMenu }: { project: Project; hours: number; comments: number; onEdit: () => void; onContextMenu: (e: React.MouseEvent) => void }) {
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<ProjectHistory | null>(null);
   const [month, setMonth] = useState('all');
@@ -115,7 +156,7 @@ function ProjectRow({ project, hours, comments, onEdit }: { project: Project; ho
 
   return (
     <div className="border-b border-slate-50 last:border-0">
-      <div className="grid grid-cols-[32px_140px_1fr_140px_140px] items-center px-6 py-4 hover:bg-slate-50">
+      <div className="grid grid-cols-[32px_140px_1fr_140px_140px] items-center px-6 py-4 hover:bg-slate-50" onContextMenu={onContextMenu}>
         <button
           onClick={toggle}
           aria-label={open ? 'Hide comments' : 'Show comments'}
@@ -126,7 +167,10 @@ function ProjectRow({ project, hours, comments, onEdit }: { project: Project; ho
         <button onClick={onEdit} className="flex items-center gap-2 text-left text-xs font-semibold text-slate-400">
           <ColorDot color={project.color} /> {project.code}
         </button>
-        <button onClick={onEdit} className="text-left font-semibold text-slate-900">{project.name}</button>
+        <button onClick={onEdit} className="text-left font-semibold text-slate-900">
+          {project.name}
+          {project.category && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{project.category}</span>}
+        </button>
         <span className="text-right font-medium text-slate-700">{comments}</span>
         <span className="text-right font-medium text-slate-700">{minutesToHhMm(hours)}</span>
       </div>

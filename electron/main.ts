@@ -267,6 +267,7 @@ function requestQuit() {
 
 function registerIpc() {
   handle('projects:list', (_e, includeInactive: boolean) => db.listProjects(includeInactive));
+  handle('projects:recentIds', () => db.listRecentProjectIds());
   handle('projects:create', (_e, input) => {
     const project = db.createProject(input);
     broadcast('projects:changed');

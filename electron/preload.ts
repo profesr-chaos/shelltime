@@ -19,7 +19,8 @@ import type {
 const api = {
   projects: {
     list: (includeInactive = true): Promise<Project[]> => ipcRenderer.invoke('projects:list', includeInactive),
-    create: (input: { code: string; name: string; color?: string; description?: string }): Promise<Project> =>
+    recentIds: (): Promise<number[]> => ipcRenderer.invoke('projects:recentIds'),
+    create: (input: { code: string; name: string; color?: string; description?: string; category?: string }): Promise<Project> =>
       ipcRenderer.invoke('projects:create', input),
     update: (id: number, patch: Partial<Project>): Promise<Project> => ipcRenderer.invoke('projects:update', id, patch),
     setActive: (id: number, isActive: boolean): Promise<Project> => ipcRenderer.invoke('projects:setActive', id, isActive),
