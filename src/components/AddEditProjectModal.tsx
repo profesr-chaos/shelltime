@@ -90,16 +90,16 @@ export function AddEditProjectModal({ project, categories = [], onClose, onSaved
     >
       <div className="flex flex-col gap-4">
         <FieldWrap label="Project code">
-          <TextInput autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="GC-TENDER" />
+          <TextInput autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. PRJ-01" />
         </FieldWrap>
         <FieldWrap label="Project name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="GC Tender Project" />
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" />
         </FieldWrap>
         <FieldWrap label="Description" hint="Optional">
           <Textarea rows={2} value={description ?? ''} onChange={(e) => setDescription(e.target.value)} />
         </FieldWrap>
         <FieldWrap label="Category" hint="Optional - e.g. customer; groups projects in the switch menu">
-          <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Acme Corp" list="project-categories" />
+          <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. customer or team" list="project-categories" />
           <datalist id="project-categories">
             {categories.map((c) => (
               <option key={c} value={c} />
