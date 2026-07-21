@@ -30,7 +30,8 @@ export function useTimer() {
   const pause = useCallback(() => window.api.timer.pause(), []);
   const resume = useCallback(() => window.api.timer.resume(), []);
   const stop = useCallback(() => window.api.timer.stop(), []);
+  const unfinish = useCallback(() => window.api.timer.unfinish(), []);
   const switchProject = useCallback((projectId: number) => window.api.timer.switchProject(projectId), []);
 
-  return { state, liveActiveSeconds, liveTodayTotalSeconds, start, pause, resume, stop, switchProject };
+  return { state, liveActiveSeconds, liveTodayTotalSeconds, start, pause, resume, stop, unfinish, switchProject };
 }

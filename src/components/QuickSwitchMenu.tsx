@@ -10,34 +10,53 @@ interface QuickSwitchMenuProps {
   onClose: () => void;
   anchorClassName?: string;
   heading?: string;
+  // Reports the menu's bottom edge (px from the window top) so the overlay window can grow to fit
+  // it exactly, instead of guessing a fixed height and leaving empty space.
+  onHeight?: (bottomPx: number) => void;
 }
 
-export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, anchorClassName = '', heading = 'Switch to' }: QuickSwitchMenuProps) {
+export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, anchorClassName = '', heading = 'Switch to', onHeight }: QuickSwitchMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [recentIds, setRecentIds] = useState<Set<number> | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  // Categories default open; a set holds the ones the user has collapsed.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    window.api.projects.recentIds().then((ids) => setRecentIds(new Set(ids)));
-  }, []);
-
-  useEffect(() => {
+    // Use 'click', not 'mousedown': the trigger button toggles on click, so a mousedown-based close
+    // fires first and the click then reopens. But bind on the next tick — the click that opened this
+    // menu is still bubbling to document, and binding now would let it immediately close the menu.
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    const t = setTimeout(() => document.addEventListener('click', onDown), 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', onDown);
+    };
   }, [onClose]);
 
-  const active = projects.filter((p) => p.isActive);
-  const recent = recentIds ? active.filter((p) => recentIds.has(p.id)) : active;
-  // Recent-only view is only worth it when it actually shortens the list.
-  const showRecentView = !showAll && recent.length > 0 && recent.length < active.length;
+  useEffect(() => {
+    if (!onHeight || !ref.current) return;
+    const report = () => ref.current && onHeight(Math.ceil(ref.current.getBoundingClientRect().bottom));
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [onHeight]);
 
-  // Full view groups by category (alphabetical, uncategorised last). Suppress headers entirely when
-  // nothing is categorised, so a category-free setup looks exactly as it did before.
+  // Never offer the project you're already on — you can't switch to it.
+  const active = projects.filter((p) => p.isActive && p.id !== activeProjectId);
+
+  // Group by category (weighted ranking, uncategorised last). Suppress headers entirely when nothing
+  // is categorised, so a category-free setup stays a plain flat list.
   const groups = groupByCategory(active, (p) => p.category);
   const hasCategories = groups.some((g) => g.category !== null);
+
+  const toggle = (cat: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
 
   const row = (p: Project) => (
     <button
@@ -46,8 +65,7 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
         onSelect(p.id);
         onClose();
       }}
-      disabled={p.id === activeProjectId}
-      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:hover:bg-slate-700"
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
     >
       <ColorDot color={p.color} className="shrink-0" />
       <span className="shrink-0 whitespace-nowrap font-medium text-slate-800 dark:text-slate-100">{p.code}</span>
@@ -62,30 +80,26 @@ export function QuickSwitchMenu({ projects, activeProjectId, onSelect, onClose, 
     >
       <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{heading}</p>
       <div className="max-h-56 overflow-y-auto">
-        {showRecentView ? (
-          <>
-            {recent.map(row)}
-            <button
-              onClick={() => setShowAll(true)}
-              className="w-full px-3 py-2 text-left text-sm font-medium text-amber hover:bg-slate-50 dark:hover:bg-slate-700"
-            >
-              More +
-            </button>
-          </>
-        ) : hasCategories ? (
-          groups.map((g) => (
-            <div key={g.category ?? '__other'} className="mb-1 last:mb-0">
-              <div className="sticky top-0 flex items-center gap-2 bg-slate-50/95 px-3 py-1 backdrop-blur dark:bg-slate-900/80">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">{g.category ?? 'Other'}</span>
-                <span className="text-[10px] font-medium tabular-nums text-slate-300 dark:text-slate-600">{g.items.length}</span>
-              </div>
-              {g.items.map(row)}
-            </div>
-          ))
-        ) : (
-          active.map(row)
-        )}
-        {active.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">No active projects</p>}
+        {hasCategories
+          ? groups.map((g) => {
+              const cat = g.category ?? 'Other';
+              const isOpen = !collapsed.has(cat);
+              return (
+                <div key={g.category ?? '__other'} className="mb-1 last:mb-0">
+                  <button
+                    onClick={() => toggle(cat)}
+                    className="sticky top-0 flex w-full items-center gap-2 bg-slate-50/95 px-3 py-1 text-left backdrop-blur dark:bg-slate-900/80"
+                  >
+                    <span className="text-slate-400">{isOpen ? '▾' : '▸'}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">{cat}</span>
+                    <span className="text-[10px] font-medium tabular-nums text-slate-300 dark:text-slate-600">{g.items.length}</span>
+                  </button>
+                  {isOpen && g.items.map(row)}
+                </div>
+              );
+            })
+          : active.map(row)}
+        {active.length === 0 && <p className="px-3 py-2 text-sm text-slate-400">No other active projects</p>}
       </div>
     </div>
   );

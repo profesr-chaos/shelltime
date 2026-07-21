@@ -22,7 +22,7 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
   const [month, setMonth] = useState(currentMonthStr());
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const { projects } = useProjects();
-  const { state, stop, start } = useTimer();
+  const { state, stop, unfinish } = useTimer();
   const [editDate, setEditDate] = useState<string | null>(null);
 
   const load = () => window.api.dashboard.getMonthlySummary(month).then(setSummary);
@@ -59,9 +59,8 @@ export function Dashboard({ onOpenExport, onOpenSettings }: DashboardProps) {
         <div className="flex items-center gap-4">
           <FinishedForToday
             finished={state.finishedForToday}
-            projects={projects}
             onStop={stop}
-            onResume={start}
+            onUnfinish={unfinish}
           />
           <Button variant="secondary" onClick={() => onOpenExport?.(month)}>Export</Button>
           <Button variant="secondary" onClick={onOpenSettings}>Settings</Button>

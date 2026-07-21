@@ -15,7 +15,7 @@ import { QuickSwitchMenu } from '@/components/QuickSwitchMenu';
 import { FinishedForToday } from '@/components/FinishedForToday';
 import { OverlayNoteView } from './OverlayNoteView';
 export function OverlayApp() {
-  const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, stop, switchProject, start } = useTimer();
+  const { state, liveActiveSeconds, liveTodayTotalSeconds, pause, resume, stop, unfinish, switchProject, start } = useTimer();
   const { projects } = useProjects();
   const { minutesWorked, snooze, snoozeFor, takeBreak } = useBreakPrompt();
   const { idle, liveIdleSeconds, keep, discard } = useIdlePrompt();
@@ -27,7 +27,6 @@ export function OverlayApp() {
   const [compact, setCompact] = useState(true);
   const [dark, setDark] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
-  const [finishPickOpen, setFinishPickOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const wasCompactBeforeBreak = useRef(false);
 
@@ -79,14 +78,11 @@ export function OverlayApp() {
   // QuickSwitchMenu closes on clicks inside the overlay; also close (and shrink the window back)
   // when the overlay loses focus, i.e. the user clicks another window entirely.
   useEffect(() => {
-    if (!switchOpen && !finishPickOpen) return;
-    const close = () => {
-      setSwitchOpen(false);
-      setFinishPickOpen(false);
-    };
+    if (!switchOpen) return;
+    const close = () => setSwitchOpen(false);
     window.addEventListener('blur', close);
     return () => window.removeEventListener('blur', close);
-  }, [switchOpen, finishPickOpen]);
+  }, [switchOpen]);
 
   const project = projects.find((p) => p.id === state.activeProjectId);
   const onBreak = minutesWorked !== null;
@@ -99,16 +95,20 @@ export function OverlayApp() {
 
   // The overlay window is normally shorter than an open dropdown, which clips its first/last
   // rows — grow the window while a menu is open, shrink it back on close.
-  const menuOpen = switchOpen || finishPickOpen;
+  const menuOpen = switchOpen;
+  // The open menu reports its own bottom edge; grow the window to that (+ a little breathing room)
+  // so the dropdown is never clipped and never leaves a big empty box below it.
+  const [menuBottom, setMenuBottom] = useState(0);
+  const menuHeight = menuBottom ? Math.ceil(menuBottom) + 8 : 320;
   useEffect(() => {
     if (review) window.api.overlay.setHeight(300);
     else if (onResume) window.api.overlay.setHeight(250);
     else if (idle) window.api.overlay.setHeight(210);
     else if (meetingPrompt.projectId !== null) window.api.overlay.setHeight(390);
     else if (onBreak) window.api.overlay.setHeight(390);
-    else if (compact) window.api.overlay.setHeight(switchOpen ? 320 : 32);
-    else window.api.overlay.setHeight(menuOpen ? 540 : 240);
-  }, [review, idle, onResume, meetingPrompt.projectId, onBreak, compact, switchOpen, menuOpen]);
+    else if (compact) window.api.overlay.setHeight(switchOpen ? menuHeight : 32);
+    else window.api.overlay.setHeight(menuOpen ? menuHeight : 240);
+  }, [review, idle, onResume, meetingPrompt.projectId, onBreak, compact, switchOpen, menuOpen, menuHeight]);
 
   if (review) {
     const delta = review.totalMinutes - review.targetMinutes;
@@ -131,7 +131,10 @@ export function OverlayApp() {
           ))}
         </div>
         <button
-          onClick={dismissReview}
+          onClick={() => {
+            dismissReview();
+            if (!review.quitting) window.api.overlay.hide(); // quitting tears the app down anyway
+          }}
           className="no-drag mt-2 w-full rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
         >
           {review.quitting ? 'Quit Shelltime' : 'Close'}
@@ -166,12 +169,11 @@ export function OverlayApp() {
         <div className="mt-3 flex justify-center">
           <FinishedForToday
             finished={false}
-            projects={projects}
             onStop={() => {
               resumePrompt.reject();
               stop();
             }}
-            onResume={start}
+            onUnfinish={unfinish}
             bordered={false}
           />
         </div>
@@ -298,6 +300,7 @@ export function OverlayApp() {
             onSelect={selectProject}
             onClose={() => setSwitchOpen(false)}
             anchorClassName="top-12 left-0"
+            onHeight={setMenuBottom}
           />
         )}
       </div>
@@ -305,7 +308,10 @@ export function OverlayApp() {
   }
 
   return (
-    <div {...drag} className={`${theme} relative flex h-full w-full select-none flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800`}>
+    // Outer fills the (menu-grown) window transparently; the card keeps its natural height so an open
+    // dropdown floats into the space below instead of stretching the card.
+    <div className={`${theme} h-full w-full`}>
+    <div {...drag} className="relative flex w-full select-none flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
       <div className="relative flex h-8 shrink-0 items-center justify-center">
         <span className="h-1 w-10 rounded-full bg-slate-200 dark:bg-slate-600" />
         <div className="no-drag absolute right-2 top-1 flex gap-1">
@@ -346,43 +352,50 @@ export function OverlayApp() {
         <div className="my-3 text-center font-mono text-3xl font-bold tabular-nums text-slate-900 dark:text-white">
           {secondsToHms(liveActiveSeconds)}
         </div>
-        <button
-          disabled={onBreak || !project}
-          onClick={() => (state.status === 'running' ? pause() : resume())}
-          className="no-drag flex w-full items-center justify-center gap-2 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-default disabled:opacity-50"
-        >
-          {state.status === 'running' ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
-          
-        </button>
-        <div className="mt-2 flex gap-2">
-          <div className="relative flex-1">
-            <IconButton label="Switch project" disabled={onBreak} className="no-drag w-full" onClick={() => setSwitchOpen((v) => !v)}>
-              <SwitchIcon width={16} height={16} />
-              
-            </IconButton>
-            {switchOpen && (
-              <QuickSwitchMenu
-                projects={projects}
-                activeProjectId={state.activeProjectId}
-                onSelect={selectProject}
-                onClose={() => setSwitchOpen(false)}
-                anchorClassName="top-10 left-0"
-              />
-            )}
-          </div>
-          <IconButton label="Add note" disabled={onBreak || !project} className="no-drag flex-1" onClick={() => setNoteOpen(true)}>
+        <div className="relative mt-2 flex gap-2">
+          <button
+            disabled={onBreak || !project}
+            onClick={() => (state.status === 'running' ? pause() : resume())}
+            className="no-drag flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-default disabled:opacity-50"
+          >
+            {state.status === 'running' ? <PauseIcon width={16} height={16} /> : <PlayIcon width={16} height={16} />}
+            {state.status === 'running' ? 'Pause' : 'Resume'}
+          </button>
+          <button
+            aria-label="Switch project"
+            title="Switch project"
+            disabled={onBreak}
+            onClick={() => setSwitchOpen((v) => !v)}
+            className="no-drag flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+          >
+            <SwitchIcon width={16} height={16} />
+          </button>
+          <button
+            aria-label="Add note"
+            title="Add note"
+            disabled={onBreak || !project}
+            onClick={() => setNoteOpen(true)}
+            className="no-drag flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+          >
             <NoteIcon width={16} height={16} />
-          </IconButton>
+          </button>
+          {switchOpen && (
+            <QuickSwitchMenu
+              projects={projects}
+              activeProjectId={state.activeProjectId}
+              onSelect={selectProject}
+              onClose={() => setSwitchOpen(false)}
+              anchorClassName="top-14 left-0"
+              onHeight={setMenuBottom}
+            />
+          )}
         </div>
         <FinishedForToday
           finished={state.finishedForToday}
-          projects={projects}
           onStop={stop}
-          onResume={start}
+          onUnfinish={unfinish}
           disabled={onBreak}
           bordered={false}
-          menuAnchorClassName="top-8 left-0"
-          onPickOpenChange={setFinishPickOpen}
           className="mt-3"
         />
       </div>
@@ -432,6 +445,7 @@ export function OverlayApp() {
         </div>
       )}
 
+    </div>
     </div>
   );
 }

@@ -420,6 +420,10 @@ function registerIpc() {
       broadcast('review:show', buildDayReview(false));
     }
   });
+  handle('timer:unfinish', () => {
+    timer.unfinish();
+    broadcast('timer:update', timer.getState());
+  });
   handle('timer:switch', (_e, projectId) => {
     closeReviewSilently(); // resuming while a card is open counts as dismissing it
     const wasIdle = timer.getState().status === 'idle';

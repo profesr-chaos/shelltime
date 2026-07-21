@@ -1,40 +1,25 @@
-import { useState } from 'react';
-import type { Project } from '@shared/types';
-import { QuickSwitchMenu } from './QuickSwitchMenu';
 import { CheckIcon } from './icons';
 
 interface FinishedForTodayProps {
   finished: boolean;
-  projects: Project[];
   onStop: () => void;
-  onResume: (projectId: number) => void;
+  onUnfinish: () => void;
   disabled?: boolean;
   bordered?: boolean;
-  menuAnchorClassName?: string;
-  onPickOpenChange?: (open: boolean) => void; // lets the overlay grow its window while the menu is open
   className?: string;
 }
 
-/** "Finished for today" toggle. Checking it stops the timer; unchecking prompts for a project to
- * resume on (the timer only runs while a project is active), so ending and restarting the day are
- * symmetric instead of leaving no obvious way back. */
+/** "Finished for today" toggle. Checking it stops the timer; unchecking just clears the flag and
+ * stays idle, so ending and un-ending the day are symmetric — a plain checkbox, not a one-way trip.
+ * (Start a project when you're ready to actually time again.) */
 export function FinishedForToday({
   finished,
-  projects,
   onStop,
-  onResume,
+  onUnfinish,
   disabled = false,
   bordered = true,
-  menuAnchorClassName = 'top-9 right-0',
-  onPickOpenChange,
   className = '',
 }: FinishedForTodayProps) {
-  const [pickOpen, setPickOpenState] = useState(false);
-  const setPickOpen = (open: boolean) => {
-    setPickOpenState(open);
-    onPickOpenChange?.(open);
-  };
-
   return (
     <div className={`relative ${className}`}>
       <button
@@ -42,7 +27,7 @@ export function FinishedForToday({
         role="checkbox"
         aria-checked={finished}
         disabled={disabled}
-        onClick={() => (finished ? setPickOpen(true) : onStop())}
+        onClick={() => (finished ? onUnfinish() : onStop())}
         className={`no-drag group flex items-center gap-2 rounded-full text-xs font-medium transition-colors disabled:cursor-default disabled:opacity-50 ${
           bordered ? 'border px-3 py-1.5' : ''
         } ${
@@ -60,19 +45,6 @@ export function FinishedForToday({
         </span>
         Finished for today
       </button>
-      {pickOpen && (
-        <QuickSwitchMenu
-          projects={projects}
-          activeProjectId={null}
-          onSelect={(id) => {
-            setPickOpen(false);
-            onResume(id);
-          }}
-          onClose={() => setPickOpen(false)}
-          anchorClassName={menuAnchorClassName}
-          heading="Resume on"
-        />
-      )}
     </div>
   );
 }

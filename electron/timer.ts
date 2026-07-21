@@ -175,6 +175,13 @@ export class TimerEngine {
     this.emit();
   }
 
+  /** Clear "finished for today" without starting a timer — the plain inverse of stop(), so the
+   * checkbox is a real toggle. Stays idle; the user starts a project when they're ready. */
+  unfinish() {
+    this.setFinishedOn(null);
+    this.emit();
+  }
+
   /** End the work session entirely (not just a pause) — no active project, so idle/resume/break
    * monitoring has nothing to nag about. Starting a new project is how the user "un-stops". */
   stop() {

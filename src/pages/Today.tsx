@@ -26,7 +26,7 @@ export function Today() {
   const [date, setDate] = useState(todayIso());
   const isToday = date === todayIso();
   const { projects, refresh: refreshProjects } = useProjects(false);
-  const { state: timerState, liveActiveSeconds, start, switchProject, stop } = useTimer();
+  const { state: timerState, liveActiveSeconds, start, switchProject, stop, unfinish } = useTimer();
 
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [target, setTarget] = useState<DailyTargetStatus | null>(null);
@@ -167,9 +167,8 @@ export function Today() {
         {isToday && (
           <FinishedForToday
             finished={timerState.finishedForToday}
-            projects={projects}
             onStop={stop}
-            onResume={(id) => (timerState.activeProjectId === null ? start(id) : switchProject(id))}
+            onUnfinish={unfinish}
           />
         )}
       </div>
