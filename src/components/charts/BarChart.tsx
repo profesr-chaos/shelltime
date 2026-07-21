@@ -26,7 +26,7 @@ export function BarChart({ data, targetMinutes, onBarClick }: BarChartProps) {
     <div className="relative" style={{ height: HEIGHT }}>
       {targetMinutes > 0 && (
         <div
-          className="absolute inset-x-0 border-t border-dashed border-slate-300"
+          className="absolute inset-x-0 z-10 border-t border-dashed border-slate-300"
           style={{ bottom: `${targetLineFromBottom}%` }}
         >
           <span className="absolute -top-4 left-0 text-[10px] text-slate-400">{minutesToHhMm(targetMinutes)} target</span>
