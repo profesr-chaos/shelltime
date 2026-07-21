@@ -270,6 +270,18 @@ export function setFinishedOn(date: string | null): void {
   ).run(JSON.stringify(date));
 }
 
+// Last app version whose change notes the user has seen. kv-only, not part of Settings.
+export function getLastSeenVersion(): string | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'lastSeenVersion'").get() as { value: string } | undefined;
+  return row ? (JSON.parse(row.value) as string | null) : null;
+}
+
+export function setLastSeenVersion(version: string): void {
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES ('lastSeenVersion', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(JSON.stringify(version));
+}
+
 // ---------- projects ----------
 
 function rowToProject(row: any): Project {

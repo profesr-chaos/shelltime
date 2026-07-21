@@ -550,6 +550,9 @@ function registerIpc() {
 
   handle('app:getDataPath', () => app.getPath('userData'));
   handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')));
+  handle('app:getVersion', () => app.getVersion());
+  handle('app:getLastSeenVersion', () => db.getLastSeenVersion());
+  handle('app:setLastSeenVersion', (_e, version: string) => db.setLastSeenVersion(version));
 }
 
 app.whenReady().then(() => {

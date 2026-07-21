@@ -209,6 +209,9 @@ const api = {
     getDataPath: (): Promise<string> => ipcRenderer.invoke('app:getDataPath'),
     openDataFolder: (): Promise<void> => ipcRenderer.invoke('app:openDataFolder'),
     backupDatabase: (): Promise<{ ok: boolean; filePath?: string; error?: string }> => ipcRenderer.invoke('backup:database'),
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+    getLastSeenVersion: (): Promise<string | null> => ipcRenderer.invoke('app:getLastSeenVersion'),
+    setLastSeenVersion: (version: string): Promise<void> => ipcRenderer.invoke('app:setLastSeenVersion', version),
   },
 };
 

@@ -14,6 +14,8 @@ import { Projects } from './pages/Projects';
 import { Settings } from './pages/Settings';
 import { Welcome } from './pages/Welcome';
 import { ExportPreview } from './pages/ExportPreview';
+import { WhatsNewModal } from './components/WhatsNewModal';
+import { CHANGELOG } from './lib/changelog';
 import { currentMonthStr } from './lib/format';
 
 export type Page = 'today' | 'dashboard' | 'projects' | 'settings';
@@ -23,6 +25,7 @@ export default function App() {
   const [exportMonth, setExportMonth] = useState<string | null>(null);
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [whatsNew, setWhatsNew] = useState<(typeof CHANGELOG)[number] | null>(null);
   const { projects, refresh } = useProjects(false);
 
   useEffect(() => {
@@ -31,6 +34,21 @@ export default function App() {
   }, []);
 
   const needsSetup = settings ? !settings.hasCompletedSetup : false;
+
+  // Show change notes once per version — but only to existing users (fresh installs see Welcome).
+  useEffect(() => {
+    if (!settings || needsSetup) return;
+    (async () => {
+      const [version, lastSeen] = await Promise.all([
+        window.api.app.getVersion(),
+        window.api.app.getLastSeenVersion(),
+      ]);
+      if (lastSeen === version) return;
+      window.api.app.setLastSeenVersion(version);
+      const entry = CHANGELOG.find((c) => c.version === version);
+      if (entry) setWhatsNew(entry);
+    })();
+  }, [settings, needsSetup]);
 
   return (
     <ToastProvider>
@@ -48,6 +66,8 @@ export default function App() {
       <ResumePromptModal />
       <MeetingPromptModal />
       <DayReviewModal />
+
+      {whatsNew && <WhatsNewModal entry={whatsNew} onClose={() => setWhatsNew(null)} />}
 
       {exportMonth && <ExportPreview month={exportMonth} onClose={() => setExportMonth(null)} />}
       {needsSetup && !welcomeDismissed && (
