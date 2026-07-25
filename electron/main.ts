@@ -41,6 +41,7 @@ const ICON_PATH = path.join(process.env.APP_ROOT, 'resources', 'icon.png');
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let confettiWindow: BrowserWindow | null = null;
+let confettiHideTimer: NodeJS.Timeout | undefined;
 let tray: Tray | null = null;
 let timer: TimerEngine;
 let attention: AttentionMonitor;
@@ -110,11 +111,12 @@ function createMainWindow() {
 // own bounds, so a burst rendered inside the main window is invisible when the user finished from the
 // popout, and one rendered inside the popout would be a 340px postage stamp. Transparent,
 // click-through and unfocusable, so it's purely something to look at.
-function showConfetti() {
-  confettiWindow?.destroy();
-  const { bounds } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-
-  const win = new BrowserWindow({
+//
+// Built hidden at startup and kept warm for the life of the app — creating and loading it on the
+// click cost a couple of seconds of dead air before anything appeared.
+function createConfettiWindow() {
+  const { bounds } = screen.getPrimaryDisplay();
+  confettiWindow = new BrowserWindow({
     ...bounds,
     show: false,
     frame: false,
@@ -126,23 +128,34 @@ function showConfetti() {
     skipTaskbar: true,
     hasShadow: false,
     enableLargerThanScreen: true,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      // The window sits hidden between bursts; without this Chromium throttles its timers and the
+      // first frames after showInactive() stutter.
+      backgroundThrottling: false,
+    },
   });
-  confettiWindow = win;
-  win.setIgnoreMouseEvents(true);
-  win.setAlwaysOnTop(true, 'screen-saver');
-  loadWindow(win, 'confetti.html');
-  win.once('ready-to-show', () => win.showInactive());
+  confettiWindow.setIgnoreMouseEvents(true);
+  loadWindow(confettiWindow, 'confetti.html');
+}
 
-  // The page closes itself when the animation ends; this is only insurance against a renderer that
-  // never gets there, so a click-through window can never be left covering the screen.
-  const backstop = setTimeout(() => {
-    if (!win.isDestroyed()) win.destroy();
-  }, 10_000);
-  win.on('closed', () => {
-    clearTimeout(backstop);
-    if (confettiWindow === win) confettiWindow = null;
-  });
+function showConfetti() {
+  const win = confettiWindow;
+  if (!win || win.isDestroyed()) return;
+
+  clearTimeout(confettiHideTimer); // a second burst mid-flight must not be cut short by the first's timer
+  win.setBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds);
+  win.setAlwaysOnTop(true, 'screen-saver'); // re-asserted per burst; other windows may have gone above
+  win.showInactive();
+
+  // The page returns how long its animation runs, so the duration lives in one place (Confetti.tsx).
+  win.webContents
+    .executeJavaScript('window.__fireConfetti()')
+    .then((ms: number) => {
+      confettiHideTimer = setTimeout(() => !win.isDestroyed() && win.hide(), ms);
+    })
+    .catch(() => win.hide()); // never leave a click-through window covering the screen
 }
 
 function createOverlayWindow() {
@@ -643,6 +656,7 @@ app.whenReady().then(() => {
   registerIpc();
   createMainWindow();
   createOverlayWindow();
+  createConfettiWindow();
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
 

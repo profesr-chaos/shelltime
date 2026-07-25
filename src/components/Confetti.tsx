@@ -1,90 +1,130 @@
-import { useEffect, useState } from 'react';
+const COLORS = ['#fbbf24', '#f87171', '#34d399', '#60a5fa', '#c084fc', '#f472b6', '#fde68a'];
+const SHELLS = 6;
+const PER_SHELL = 48;
+const SPARK_MS = 1500;
+const FLASH_MS = 420;
+const STAGGER_MS = 260;
 
-const COLORS = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#a855f7', '#ec4899'];
-const BURSTS = 6;
-const PER_BURST = 34;
-const DURATION_MS = 2800;
-const STAGGER_MS = 110;
+/** How long a full display lasts, so the host window knows when it can hide again. */
+export const CONFETTI_TOTAL_MS = SPARK_MS + (SHELLS - 1) * STAGGER_MS + 200;
 
-interface Piece {
+interface Spark {
   left: number; // vw
   top: number; // vh
   dx: number; // px
-  dy: number; // px, before gravity
-  rot: number; // deg
+  dy: number; // px
+  drop: number; // px of droop after the shell has spent itself
   delay: number; // ms
   color: string;
   size: number; // px
-  round: boolean;
 }
 
-// ponytail: CSS-animated divs rather than a canvas-confetti dependency. ~120 GPU-composited
-// transforms is nothing; reach for a real particle engine only if the physics needs to be convincing.
-const makePieces = (): Piece[] =>
-  Array.from({ length: BURSTS }).flatMap((_, b) => {
-    // Walk the origins left-to-right across the viewport (with a little jitter) so the bursts cover
+interface Shell {
+  left: number;
+  top: number;
+  delay: number;
+  color: string;
+  sparks: Spark[];
+}
+
+// ponytail: CSS-animated spans rather than a canvas particle engine. ~240 GPU-composited transforms
+// is nothing; reach for a real engine only if the physics needs to be convincing.
+const makeShells = (): Shell[] =>
+  Array.from({ length: SHELLS }, (_, s): Shell => {
+    // Walk the origins left-to-right across the viewport (with a little jitter) so the shells cover
     // the screen instead of clumping wherever the random numbers happened to land.
-    const originX = 12 + ((b + 0.5) * 76) / BURSTS + (Math.random() - 0.5) * 12;
-    const originY = 22 + Math.random() * 40;
-    const delay = b * STAGGER_MS;
-    return Array.from({ length: PER_BURST }, (): Piece => {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 140 + Math.random() * 420;
-      return {
-        left: originX,
-        top: originY,
-        dx: Math.cos(angle) * speed,
-        dy: Math.sin(angle) * speed,
-        rot: (Math.random() - 0.5) * 1000,
-        delay: delay + Math.random() * 130,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        size: 8 + Math.random() * 9,
-        round: Math.random() < 0.35,
-      };
-    });
+    const left = 12 + ((s + 0.5) * 76) / SHELLS + (Math.random() - 0.5) * 10;
+    // Alternate high/low so the shells fill the screen vertically instead of all going off in a band.
+    const top = (s % 2 ? 46 : 22) + Math.random() * 18;
+    const delay = s * STAGGER_MS;
+    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const radius = 240 + Math.random() * 230;
+
+    return {
+      left,
+      top,
+      delay,
+      color,
+      // Evenly spaced angles with only a little jitter — that even spacing is what reads as a
+      // firework rather than a random spray.
+      sparks: Array.from({ length: PER_SHELL }, (_, i): Spark => {
+        const angle = ((i + Math.random() * 0.6) / PER_SHELL) * Math.PI * 2;
+        const r = radius * (0.62 + Math.random() * 0.38);
+        return {
+          left,
+          top,
+          dx: Math.cos(angle) * r,
+          dy: Math.sin(angle) * r,
+          drop: 70 + Math.random() * 110,
+          delay: delay + Math.random() * 40,
+          // Mostly the shell's own colour, with a few stray sparks so it isn't flat.
+          color: Math.random() < 0.82 ? color : COLORS[Math.floor(Math.random() * COLORS.length)],
+          size: 4 + Math.random() * 4,
+        };
+      }),
+    };
   });
 
 /**
- * Full-screen confetti burst. Fires once on mount then calls onDone so the parent can unmount it —
- * remount with a fresh `key` to fire again.
+ * Full-screen firework burst. Plays once per mount — remount with a fresh `key` to fire again,
+ * and hide/unmount after CONFETTI_TOTAL_MS.
  */
-export function Confetti({ onDone }: { onDone: () => void }) {
-  const [pieces] = useState(makePieces);
-
-  useEffect(() => {
-    const id = setTimeout(onDone, DURATION_MS + BURSTS * STAGGER_MS);
-    return () => clearTimeout(id);
-  }, [onDone]);
+export function Confetti() {
+  // Generated during render rather than in state: this component is mounted precisely to play once.
+  const shells = makeShells();
 
   // No prefers-reduced-motion gate: Chromium reports `reduce` on this machine even with Windows
-  // animations enabled, which killed the effect outright. It's a 2.6s flourish the user triggers by
+  // animations enabled, which killed the effect outright. It's a 2.5s flourish the user triggers by
   // hand, so it always plays — put it behind a setting if that ever needs to be opt-out.
   return (
     <div className="pointer-events-none fixed inset-0 z-[200] overflow-hidden">
       <style>{`
-        @keyframes shelltime-confetti {
-          0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-          65%  { opacity: 1; }
-          100% { transform: translate(var(--dx), calc(var(--dy) + 80vh)) rotate(var(--rot)); opacity: 0; }
+        @keyframes shelltime-spark {
+          0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+          70%  { transform: translate(var(--dx), var(--dy)) scale(0.85); opacity: 1; }
+          100% { transform: translate(calc(var(--dx) * 1.06), calc(var(--dy) + var(--drop))) scale(0.25); opacity: 0; }
+        }
+        @keyframes shelltime-flash {
+          0%   { transform: translate(-50%, -50%) scale(0.15); opacity: 0.85; }
+          100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
         }
       `}</style>
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          style={{
-            position: 'absolute',
-            left: `${p.left}vw`,
-            top: `${p.top}vh`,
-            width: p.size,
-            height: p.round ? p.size : p.size * 0.5,
-            background: p.color,
-            borderRadius: p.round ? '9999px' : '1px',
-            ['--dx' as string]: `${p.dx}px`,
-            ['--dy' as string]: `${p.dy}px`,
-            ['--rot' as string]: `${p.rot}deg`,
-            animation: `shelltime-confetti ${DURATION_MS}ms cubic-bezier(0.15, 0.6, 0.4, 1) ${p.delay}ms forwards`,
-          }}
-        />
+      {shells.map((sh, s) => (
+        <div key={s}>
+          {/* The blown-out core of the shell — brief, and what sells the "it just exploded" moment. */}
+          <span
+            style={{
+              position: 'absolute',
+              left: `${sh.left}vw`,
+              top: `${sh.top}vh`,
+              width: 150,
+              height: 150,
+              borderRadius: '9999px',
+              background: `radial-gradient(circle, #fff 0%, ${sh.color} 35%, transparent 70%)`,
+              animation: `shelltime-flash ${FLASH_MS}ms ease-out ${sh.delay}ms forwards`,
+              opacity: 0,
+            }}
+          />
+          {sh.sparks.map((p, i) => (
+            <span
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `${p.left}vw`,
+                top: `${p.top}vh`,
+                width: p.size,
+                height: p.size,
+                background: p.color,
+                borderRadius: '9999px',
+                boxShadow: `0 0 ${p.size * 2.5}px ${p.color}`,
+                ['--dx' as string]: `${p.dx}px`,
+                ['--dy' as string]: `${p.dy}px`,
+                ['--drop' as string]: `${p.drop}px`,
+                animation: `shelltime-spark ${SPARK_MS}ms cubic-bezier(0.05, 0.75, 0.2, 1) ${p.delay}ms forwards`,
+              }}
+            />
+          ))}
+        </div>
       ))}
     </div>
   );
