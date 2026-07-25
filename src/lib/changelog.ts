@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.0',
+    highlights: [
+      'Confetti across the whole screen when you finish for the day — wherever you finish from, including the popout.',
+      'Fixed the Today progress bar jumping backwards when you finished the day without pausing the timer first.',
+      'Tidier Edit Timings distribution chooser.',
+    ],
+  },
+  {
     version: '0.6.0',
     highlights: [
       'Group projects by category across the Today and Projects tabs, with collapsible sections ranked by hours worked.',
