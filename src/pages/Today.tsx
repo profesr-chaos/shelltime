@@ -65,9 +65,12 @@ export function Today() {
     window.api.entries.getDailyTotal(yStr).then(setYesterdayMinutes);
   }, [date]);
 
+  // Reload on mount, on date change, and on every timer transition. The idle transition matters most:
+  // stop() flushes the session to the DB and clears activeProjectId, so without a refresh the totals
+  // fall back to an `entries` snapshot taken when the session started.
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, timerState.status, timerState.activeProjectId]);
 
   // Auto-advance to the new logical day once it starts, but only while viewing "today" — a user
   // looking at a past day should not get yanked forward.
@@ -78,10 +81,6 @@ export function Today() {
     }, 60_000);
     return () => clearInterval(id);
   }, [isToday]);
-
-  useEffect(() => {
-    if (timerState.status !== 'idle') load();
-  }, [timerState.status, timerState.activeProjectId, load]);
 
   const trackedMinutes = isToday
     ? entries.reduce((s, e) => s + (e.projectId === timerState.activeProjectId ? 0 : e.durationMinutes), 0)
