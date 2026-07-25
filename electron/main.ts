@@ -40,6 +40,7 @@ const ICON_PATH = path.join(process.env.APP_ROOT, 'resources', 'icon.png');
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let confettiWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let timer: TimerEngine;
 let attention: AttentionMonitor;
@@ -102,6 +103,45 @@ function createMainWindow() {
     if ((app as any).isQuitting) return;
     e.preventDefault();
     requestQuit();
+  });
+}
+
+// Celebrate finishing the day. This needs its own window: an Electron window can't paint outside its
+// own bounds, so a burst rendered inside the main window is invisible when the user finished from the
+// popout, and one rendered inside the popout would be a 340px postage stamp. Transparent,
+// click-through and unfocusable, so it's purely something to look at.
+function showConfetti() {
+  confettiWindow?.destroy();
+  const { bounds } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+
+  const win = new BrowserWindow({
+    ...bounds,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  confettiWindow = win;
+  win.setIgnoreMouseEvents(true);
+  win.setAlwaysOnTop(true, 'screen-saver');
+  loadWindow(win, 'confetti.html');
+  win.once('ready-to-show', () => win.showInactive());
+
+  // The page closes itself when the animation ends; this is only insurance against a renderer that
+  // never gets there, so a click-through window can never be left covering the screen.
+  const backstop = setTimeout(() => {
+    if (!win.isDestroyed()) win.destroy();
+  }, 10_000);
+  win.on('closed', () => {
+    clearTimeout(backstop);
+    if (confettiWindow === win) confettiWindow = null;
   });
 }
 
@@ -415,6 +455,7 @@ function registerIpc() {
     timer.stop();
     attention.notifyStop();
     broadcast('timer:update', timer.getState());
+    showConfetti();
     if (!reviewOpen) {
       reviewOpen = true;
       broadcast('review:show', buildDayReview(false));

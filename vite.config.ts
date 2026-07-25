@@ -42,6 +42,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         overlay: path.resolve(__dirname, 'overlay.html'),
+        confetti: path.resolve(__dirname, 'confetti.html'),
       },
     },
   },
