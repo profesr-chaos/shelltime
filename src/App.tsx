@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
 import { Sidebar } from './components/Sidebar';
 import { BottomTimerBar } from './components/BottomTimerBar';
@@ -35,6 +35,10 @@ export default function App() {
   // Celebrate the finish, wherever it was clicked from (Today, Dashboard or the overlay) — the flag
   // is broadcast to every window. Only edges after the real state has loaded count, so a day that was
   // already finished before launch doesn't set it off on startup.
+  // Stable identity: App re-renders every second (the timer tick), and Confetti keys its
+  // self-unmount timeout off this callback.
+  const clearConfetti = useCallback(() => setConfettiKey(null), []);
+
   const wasFinished = useRef<boolean | null>(null);
   useEffect(() => {
     if (!timerLoaded) return;
@@ -82,7 +86,7 @@ export default function App() {
       <MeetingPromptModal />
       <DayReviewModal />
 
-      {confettiKey !== null && <Confetti key={confettiKey} onDone={() => setConfettiKey(null)} />}
+      {confettiKey !== null && <Confetti key={confettiKey} onDone={clearConfetti} />}
 
       {whatsNew && <WhatsNewModal entry={whatsNew} onClose={() => setWhatsNew(null)} />}
 

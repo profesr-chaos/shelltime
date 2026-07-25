@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
 const COLORS = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#a855f7', '#ec4899'];
-const BURSTS = 5;
-const PER_BURST = 24;
-const DURATION_MS = 2600;
+const BURSTS = 6;
+const PER_BURST = 34;
+const DURATION_MS = 2800;
+const STAGGER_MS = 110;
 
 interface Piece {
   left: number; // vw
@@ -21,21 +22,23 @@ interface Piece {
 // transforms is nothing; reach for a real particle engine only if the physics needs to be convincing.
 const makePieces = (): Piece[] =>
   Array.from({ length: BURSTS }).flatMap((_, b) => {
-    const originX = 15 + Math.random() * 70;
-    const originY = 20 + Math.random() * 50;
-    const delay = b * 130;
+    // Walk the origins left-to-right across the viewport (with a little jitter) so the bursts cover
+    // the screen instead of clumping wherever the random numbers happened to land.
+    const originX = 12 + ((b + 0.5) * 76) / BURSTS + (Math.random() - 0.5) * 12;
+    const originY = 22 + Math.random() * 40;
+    const delay = b * STAGGER_MS;
     return Array.from({ length: PER_BURST }, (): Piece => {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 60 + Math.random() * 220;
+      const speed = 140 + Math.random() * 420;
       return {
         left: originX,
         top: originY,
         dx: Math.cos(angle) * speed,
         dy: Math.sin(angle) * speed,
-        rot: (Math.random() - 0.5) * 900,
-        delay: delay + Math.random() * 120,
+        rot: (Math.random() - 0.5) * 1000,
+        delay: delay + Math.random() * 130,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        size: 6 + Math.random() * 6,
+        size: 8 + Math.random() * 9,
         round: Math.random() < 0.35,
       };
     });
@@ -49,19 +52,20 @@ export function Confetti({ onDone }: { onDone: () => void }) {
   const [pieces] = useState(makePieces);
 
   useEffect(() => {
-    const id = setTimeout(onDone, DURATION_MS + BURSTS * 130);
+    const id = setTimeout(onDone, DURATION_MS + BURSTS * STAGGER_MS);
     return () => clearTimeout(id);
   }, [onDone]);
 
-  // Respect the OS "reduce motion" setting — a screenful of flying objects is exactly what it means.
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
-
+  // No prefers-reduced-motion gate: Chromium reports `reduce` on this machine even with Windows
+  // animations enabled, which killed the effect outright. It's a 2.6s flourish the user triggers by
+  // hand, so it always plays — put it behind a setting if that ever needs to be opt-out.
   return (
     <div className="pointer-events-none fixed inset-0 z-[200] overflow-hidden">
       <style>{`
         @keyframes shelltime-confetti {
           0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-          100% { transform: translate(var(--dx), calc(var(--dy) + 70vh)) rotate(var(--rot)); opacity: 0; }
+          65%  { opacity: 1; }
+          100% { transform: translate(var(--dx), calc(var(--dy) + 80vh)) rotate(var(--rot)); opacity: 0; }
         }
       `}</style>
       {pieces.map((p, i) => (
