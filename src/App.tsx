@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Settings as SettingsType } from '@shared/types';
 import { Sidebar } from './components/Sidebar';
 import { BottomTimerBar } from './components/BottomTimerBar';
@@ -7,7 +7,9 @@ import { ResumePromptModal } from './components/ResumePromptModal';
 import { MeetingPromptModal } from './components/MeetingPromptModal';
 import { DayReviewModal } from './components/DayReviewModal';
 import { ToastProvider } from './components/ui/Toast';
+import { Confetti } from './components/Confetti';
 import { useProjects } from './hooks/useProjects';
+import { useTimer } from './hooks/useTimer';
 import { Today } from './pages/Today';
 import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
@@ -26,7 +28,20 @@ export default function App() {
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [whatsNew, setWhatsNew] = useState<(typeof CHANGELOG)[number] | null>(null);
+  const [confettiKey, setConfettiKey] = useState<number | null>(null);
   const { projects, refresh } = useProjects(false);
+  const { state: timerState, loaded: timerLoaded } = useTimer();
+
+  // Celebrate the finish, wherever it was clicked from (Today, Dashboard or the overlay) — the flag
+  // is broadcast to every window. Only edges after the real state has loaded count, so a day that was
+  // already finished before launch doesn't set it off on startup.
+  const wasFinished = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!timerLoaded) return;
+    const prev = wasFinished.current;
+    wasFinished.current = timerState.finishedForToday;
+    if (prev === false && timerState.finishedForToday) setConfettiKey((k) => (k ?? 0) + 1);
+  }, [timerLoaded, timerState.finishedForToday]);
 
   useEffect(() => {
     window.api.settings.get().then(setSettings);
@@ -66,6 +81,8 @@ export default function App() {
       <ResumePromptModal />
       <MeetingPromptModal />
       <DayReviewModal />
+
+      {confettiKey !== null && <Confetti key={confettiKey} onDone={() => setConfettiKey(null)} />}
 
       {whatsNew && <WhatsNewModal entry={whatsNew} onClose={() => setWhatsNew(null)} />}
 

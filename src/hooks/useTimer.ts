@@ -13,10 +13,16 @@ const EMPTY_STATE: TimerState = {
 
 export function useTimer() {
   const [state, setState] = useState<TimerState>(EMPTY_STATE);
+  // False until the real state arrives from the main process, so callers can tell an actual idle day
+  // apart from the EMPTY_STATE placeholder.
+  const [loaded, setLoaded] = useState(false);
   const now = useNowTick(1000);
 
   useEffect(() => {
-    window.api.timer.getState().then(setState);
+    window.api.timer.getState().then((s) => {
+      setState(s);
+      setLoaded(true);
+    });
     const unsubscribe = window.api.timer.onUpdate(setState);
     return unsubscribe;
   }, []);
@@ -33,5 +39,5 @@ export function useTimer() {
   const unfinish = useCallback(() => window.api.timer.unfinish(), []);
   const switchProject = useCallback((projectId: number) => window.api.timer.switchProject(projectId), []);
 
-  return { state, liveActiveSeconds, liveTodayTotalSeconds, start, pause, resume, stop, unfinish, switchProject };
+  return { state, loaded, liveActiveSeconds, liveTodayTotalSeconds, start, pause, resume, stop, unfinish, switchProject };
 }
