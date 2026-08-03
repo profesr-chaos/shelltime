@@ -18,8 +18,10 @@ export function PrintReport({ month }: { month: string }) {
   const [timeFormat, setTimeFormat] = useState<Settings['exportTimeFormat']>('hhmm');
   const [exportedAt] = useState(() => new Date());
 
-  const duration = timeFormat === 'decimal' ? minutesToDecimalHours : minutesToHhMm;
-  const signedDuration = timeFormat === 'decimal' ? signedMinutesToDecimalHours : signedMinutesToHhMm;
+  const sep = (s: string) => (timeFormat === 'decimalComma' ? s.replace('.', ',') : s);
+  const duration = (m: number) => (timeFormat === 'hhmm' ? minutesToHhMm(m) : sep(minutesToDecimalHours(m)));
+  const signedDuration = (m: number) =>
+    timeFormat === 'hhmm' ? signedMinutesToHhMm(m) : sep(signedMinutesToDecimalHours(m));
   const hoursCell = (minutes: number): string => (minutes > 0 ? duration(minutes) : '');
 
   useEffect(() => {

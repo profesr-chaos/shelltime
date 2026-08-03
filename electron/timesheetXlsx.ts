@@ -10,7 +10,7 @@ const formatMonth = (month: string) => {
 export async function buildTimesheetWorkbook(
   summary: MonthlySummary,
   userName = 'Shelltime',
-  timeFormat: 'hhmm' | 'decimal' = 'hhmm',
+  timeFormat: 'hhmm' | 'decimal' | 'decimalComma' = 'hhmm',
 ): Promise<Buffer> {
   const { month } = summary;
   const [y, m] = month.split('-').map(Number);
@@ -22,13 +22,19 @@ export async function buildTimesheetWorkbook(
     return wd === 0 || wd === 6;
   };
   // hhmm cells are Excel time serials (fraction of a day) so they stay numeric and summable.
+  // decimalComma cells are text ("7,5") so pasting into a comma-locale Excel doesn't turn them into
+  // dates; the trade-off is they won't sum in formulas.
   const durationNumFmt = timeFormat === 'hhmm' ? '[h]:mm' : '0.00';
-  const asCell = (minutes: number) =>
-    timeFormat === 'hhmm' ? minutes / 1440 : Math.round((minutes / 60) * 100) / 100;
+  const decimal = (minutes: number) => Math.round((minutes / 60) * 100) / 100;
+  const asCell = (minutes: number): number | string => {
+    if (timeFormat === 'hhmm') return minutes / 1440;
+    const h = decimal(minutes);
+    return timeFormat === 'decimalComma' ? String(h).replace('.', ',') : h;
+  };
   // Blank rather than 0.00 whenever the value rounds to zero (covers tiny sub-rounding minutes too).
   const hours = (minutes: number) => {
-    const v = asCell(minutes);
-    return v > 0 ? v : null;
+    if (timeFormat === 'hhmm') return minutes > 0 ? asCell(minutes) : null;
+    return decimal(minutes) > 0 ? asCell(minutes) : null;
   };
   // Excel can't render negative time serials, so signed KPI durations fall back to text in hhmm mode.
   const signedHhMm = (minutes: number) => {
@@ -103,10 +109,10 @@ export async function buildTimesheetWorkbook(
     ['Overtime (cumulative)', summary.cumulativeOvertimeMinutes],
   ];
   for (const [label, minutes] of kpis) {
-    const negativeAsText = timeFormat === 'hhmm' && minutes < 0;
-    const r = ws.addRow([label, negativeAsText ? signedHhMm(minutes) : asCell(minutes)]);
+    const value = timeFormat === 'hhmm' && minutes < 0 ? signedHhMm(minutes) : asCell(minutes);
+    const r = ws.addRow([label, value]);
     r.getCell(1).font = { bold: true };
-    if (!negativeAsText) r.getCell(2).numFmt = durationNumFmt;
+    if (typeof value === 'number') r.getCell(2).numFmt = durationNumFmt;
   }
 
   return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);

@@ -9,7 +9,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.7.2',
     highlights: [
-      'New export setting to choose how times appear in reports and spreadsheets: hours and minutes (7:30) or decimal hours (7.5).',
+      'New export setting to choose how times appear in reports and spreadsheets: hours and minutes (7:30), decimal hours (7.5), or comma decimals (7,5) for pasting into EU-locale Excel.',
     ],
   },
   {
