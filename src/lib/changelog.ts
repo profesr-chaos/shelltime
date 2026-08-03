@@ -7,6 +7,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.2',
+    highlights: [
+      'New export setting to choose how times appear in reports and spreadsheets: hours and minutes (7:30) or decimal hours (7.5).',
+    ],
+  },
+  {
     version: '0.7.1',
     highlights: [
       'The finish-for-today celebration is now a firework display, and it fires the instant you click.',
