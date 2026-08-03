@@ -272,6 +272,17 @@ export function Settings() {
             onChange={(e) => updateDebounced({ exportPrefix: e.target.value })}
           />
         </FieldWrap>
+        <FieldWrap label="Time format" tooltip="How durations appear in exported reports and spreadsheets. The comma option writes text cells that paste cleanly into comma-decimal (EU) Excel, but they won't sum in formulas.">
+          <Select
+            value={settings.exportTimeFormat}
+            onChange={(e) => update({ exportTimeFormat: e.target.value as SettingsType['exportTimeFormat'] })}
+            className="max-w-xs"
+          >
+            <option value="hhmm">Hours and minutes (7:30)</option>
+            <option value="decimal">Decimal hours (7.5)</option>
+            <option value="decimalComma">Decimal hours, comma (7,5)</option>
+          </Select>
+        </FieldWrap>
       </Section>
 
       <Section title="Data">

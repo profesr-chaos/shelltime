@@ -543,7 +543,12 @@ function registerIpc() {
     });
     if (canceled || !filePath) return { ok: false, error: 'Export cancelled' };
     const { buildTimesheetWorkbook } = await import('./timesheetXlsx');
-    const buffer = await buildTimesheetWorkbook(db.getMonthlySummary(month), db.getSettings().userName?.trim() || 'Shelltime');
+    const settings = db.getSettings();
+    const buffer = await buildTimesheetWorkbook(
+      db.getMonthlySummary(month),
+      settings.userName?.trim() || 'Shelltime',
+      settings.exportTimeFormat,
+    );
     const fs = await import('node:fs/promises');
     await fs.writeFile(filePath, buffer);
     return { ok: true, filePath };
