@@ -272,6 +272,16 @@ export function Settings() {
             onChange={(e) => updateDebounced({ exportPrefix: e.target.value })}
           />
         </FieldWrap>
+        <FieldWrap label="Time format" tooltip="How durations appear in exported reports and spreadsheets.">
+          <Select
+            value={settings.exportTimeFormat}
+            onChange={(e) => update({ exportTimeFormat: e.target.value as SettingsType['exportTimeFormat'] })}
+            className="max-w-xs"
+          >
+            <option value="hhmm">Hours and minutes (7:30)</option>
+            <option value="decimal">Decimal hours (7.5)</option>
+          </Select>
+        </FieldWrap>
       </Section>
 
       <Section title="Data">

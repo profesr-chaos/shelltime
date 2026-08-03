@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: Settings = {
   holidayRegion: 'GB-ENG',
   hasCompletedSetup: false,
   exportPrefix: 'Shelltime',
+  exportTimeFormat: 'hhmm',
   userName: 'Shelltime',
   calendarIcsUrl: '',
   meetingSwitchSuggestMinutes: 30,

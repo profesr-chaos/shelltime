@@ -21,6 +21,17 @@ export function signedMinutesToHhMm(totalMinutes: number): string {
   return `${sign}${h}:${String(m).padStart(2, '0')}`;
 }
 
+// Decimal hours for exports: 30 min -> "0.5", 452 min -> "7.53". Two decimals max, no trailing zeros.
+export function minutesToDecimalHours(totalMinutes: number): string {
+  return String(Math.round((totalMinutes / 60) * 100) / 100);
+}
+
+// Signed decimal hours for deltas: "+0.75" / "-1.08" / "0".
+export function signedMinutesToDecimalHours(totalMinutes: number): string {
+  const s = minutesToDecimalHours(totalMinutes);
+  return totalMinutes > 0 && s !== '0' ? `+${s}` : s;
+}
+
 // Clock time (24h, HH:mm) — for "when did work start/end", distinct from the h:mm duration format above.
 export function formatClockTime(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value;

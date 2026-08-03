@@ -7,7 +7,11 @@ const formatMonth = (month: string) => {
 };
 
 // Builds the timesheet as a project-x-day grid workbook, mirroring the PDF report.
-export async function buildTimesheetWorkbook(summary: MonthlySummary, userName = 'Shelltime'): Promise<Buffer> {
+export async function buildTimesheetWorkbook(
+  summary: MonthlySummary,
+  userName = 'Shelltime',
+  timeFormat: 'hhmm' | 'decimal' = 'hhmm',
+): Promise<Buffer> {
   const { month } = summary;
   const [y, m] = month.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -17,10 +21,20 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary, userName =
     const wd = new Date(y, m - 1, d).getDay();
     return wd === 0 || wd === 6;
   };
-  // Blank rather than 0.00 whenever the value rounds to zero hours (covers tiny sub-rounding minutes too).
+  // hhmm cells are Excel time serials (fraction of a day) so they stay numeric and summable.
+  const durationNumFmt = timeFormat === 'hhmm' ? '[h]:mm' : '0.00';
+  const asCell = (minutes: number) =>
+    timeFormat === 'hhmm' ? minutes / 1440 : Math.round((minutes / 60) * 100) / 100;
+  // Blank rather than 0.00 whenever the value rounds to zero (covers tiny sub-rounding minutes too).
   const hours = (minutes: number) => {
-    const h = Math.round((minutes / 60) * 100) / 100;
-    return h > 0 ? h : null;
+    const v = asCell(minutes);
+    return v > 0 ? v : null;
+  };
+  // Excel can't render negative time serials, so signed KPI durations fall back to text in hhmm mode.
+  const signedHhMm = (minutes: number) => {
+    const sign = minutes < 0 ? '-' : '';
+    const abs = Math.round(Math.abs(minutes));
+    return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, '0')}`;
   };
 
   const wb = new ExcelJS.Workbook();
@@ -58,7 +72,7 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary, userName =
       const mins = summary.grid.reduce((s, row) => s + (row.minutesByDate[dateStr(d)] ?? 0), 0);
       return hours(mins);
     }),
-    Math.round((summary.actualMinutes / 60) * 100) / 100,
+    asCell(summary.actualMinutes),
   ]);
   totalRow.font = { bold: true };
   totalRow.border = { top: { style: 'thin' } };
@@ -76,22 +90,23 @@ export async function buildTimesheetWorkbook(summary: MonthlySummary, userName =
   ws.getColumn(1).width = 34;
   for (let c = 2; c <= days.length + 2; c++) {
     ws.getColumn(c).width = 5.5;
-    ws.getColumn(c).numFmt = '0.00';
+    ws.getColumn(c).numFmt = durationNumFmt;
   }
 
   // KPI block below the grid
   ws.addRow([]);
   const kpis: [string, number][] = [
-    ['Total hours worked', summary.actualMinutes / 60],
-    ['Target hours', summary.targetMinutes / 60],
-    ['Overtime (this month)', summary.thisMonthOvertimeMinutes / 60],
-    ['Overtime carried over', summary.carriedOverOvertimeMinutes / 60],
-    ['Overtime (cumulative)', summary.cumulativeOvertimeMinutes / 60],
+    ['Total hours worked', summary.actualMinutes],
+    ['Target hours', summary.targetMinutes],
+    ['Overtime (this month)', summary.thisMonthOvertimeMinutes],
+    ['Overtime carried over', summary.carriedOverOvertimeMinutes],
+    ['Overtime (cumulative)', summary.cumulativeOvertimeMinutes],
   ];
-  for (const [label, value] of kpis) {
-    const r = ws.addRow([label, Math.round(value * 100) / 100]);
+  for (const [label, minutes] of kpis) {
+    const negativeAsText = timeFormat === 'hhmm' && minutes < 0;
+    const r = ws.addRow([label, negativeAsText ? signedHhMm(minutes) : asCell(minutes)]);
     r.getCell(1).font = { bold: true };
-    r.getCell(2).numFmt = '0.00';
+    if (!negativeAsText) r.getCell(2).numFmt = durationNumFmt;
   }
 
   return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);

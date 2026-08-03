@@ -82,6 +82,7 @@ export interface Settings {
   holidayRegion: string; // "GB-ENG", "IE", "US" … country code, optionally "-STATE"
   hasCompletedSetup: boolean; // false until the user has reviewed the essential settings
   exportPrefix: string; // filename prefix for exports: <exportPrefix>_<date>
+  exportTimeFormat: 'hhmm' | 'decimal'; // durations in exports: "7:30" vs "7.5"
   userName: string; // shown in report headings: "<userName> - Monthly Report"
   calendarIcsUrl: string; // published busy/free ICS feed URL; '' = calendar feature off
   meetingSwitchSuggestMinutes: number; // suppress the meeting-switch prompt if the user switched within this many minutes

@@ -1,20 +1,34 @@
 import { useEffect, useState } from 'react';
-import type { MonthlySummary, Note, Project } from '@shared/types';
-import { formatMonth, minutesToHhMm, signedMinutesToHhMm, formatDateShort } from '@/lib/format';
+import type { MonthlySummary, Note, Project, Settings } from '@shared/types';
+import {
+  formatMonth,
+  minutesToHhMm,
+  signedMinutesToHhMm,
+  minutesToDecimalHours,
+  signedMinutesToDecimalHours,
+  formatDateShort,
+} from '@/lib/format';
 
 type NoteWithProject = Note & { project: Project };
-const hoursCell = (minutes: number): string => (minutes > 0 ? minutesToHhMm(minutes) : '');
 
 export function PrintReport({ month }: { month: string }) {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
   const [notes, setNotes] = useState<NoteWithProject[]>([]);
   const [userName, setUserName] = useState('Shelltime');
+  const [timeFormat, setTimeFormat] = useState<Settings['exportTimeFormat']>('hhmm');
   const [exportedAt] = useState(() => new Date());
+
+  const duration = timeFormat === 'decimal' ? minutesToDecimalHours : minutesToHhMm;
+  const signedDuration = timeFormat === 'decimal' ? signedMinutesToDecimalHours : signedMinutesToHhMm;
+  const hoursCell = (minutes: number): string => (minutes > 0 ? duration(minutes) : '');
 
   useEffect(() => {
     window.api.dashboard.getMonthlySummary(month).then(setSummary);
     window.api.notes.listForMonth(month).then(setNotes);
-    window.api.settings.get().then((s) => setUserName(s.userName?.trim() || 'Shelltime'));
+    window.api.settings.get().then((s) => {
+      setUserName(s.userName?.trim() || 'Shelltime');
+      setTimeFormat(s.exportTimeFormat);
+    });
   }, [month]);
 
   if (!summary) {
@@ -84,7 +98,7 @@ export function PrintReport({ month }: { month: string }) {
                   </td>
                 );
               })}
-              <td className="px-1 py-1 font-bold tabular-nums">{minutesToHhMm(row.totalMinutes)}</td>
+              <td className="px-1 py-1 font-bold tabular-nums">{duration(row.totalMinutes)}</td>
             </tr>
           ))}
         </tbody>
@@ -99,7 +113,7 @@ export function PrintReport({ month }: { month: string }) {
                 </td>
               );
             })}
-            <td className="px-1 py-1 tabular-nums">{minutesToHhMm(summary.actualMinutes)}</td>
+            <td className="px-1 py-1 tabular-nums">{duration(summary.actualMinutes)}</td>
           </tr>
         </tfoot>
       </table>
@@ -107,16 +121,16 @@ export function PrintReport({ month }: { month: string }) {
       <p className="mt-2 text-[9px] text-slate-400">Hours worked per project per day. Weekend columns are shaded.</p>
 
       <section className="mt-6 grid grid-cols-4 gap-4">
-        <Kpi label="Total hours worked" value={minutesToHhMm(summary.actualMinutes)} />
-        <Kpi label="Target hours" value={minutesToHhMm(summary.targetMinutes)} />
+        <Kpi label="Total hours worked" value={duration(summary.actualMinutes)} />
+        <Kpi label="Target hours" value={duration(summary.targetMinutes)} />
         <Kpi
           label="Overtime (month)"
-          value={signedMinutesToHhMm(summary.thisMonthOvertimeMinutes)}
+          value={signedDuration(summary.thisMonthOvertimeMinutes)}
           valueClass={isOvertime ? 'text-emerald-600' : 'text-red-500'}
         />
         <Kpi
           label="Overtime (cumulative)"
-          value={signedMinutesToHhMm(summary.cumulativeOvertimeMinutes)}
+          value={signedDuration(summary.cumulativeOvertimeMinutes)}
           valueClass={summary.cumulativeOvertimeMinutes >= 0 ? 'text-emerald-600' : 'text-red-500'}
         />
       </section>
