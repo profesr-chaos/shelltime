@@ -45,35 +45,38 @@ export async function buildTimesheetWorkbook(
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Shelltime';
-  const ws = wb.addWorksheet('Timesheet', { views: [{ state: 'frozen', xSplit: 1, ySplit: 3 }] });
+  const ws = wb.addWorksheet('Timesheet', { views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }] });
 
-  ws.mergeCells(1, 1, 1, days.length + 2);
+  ws.mergeCells(1, 1, 1, days.length + 3);
   ws.getCell(1, 1).value = `${userName} - Timesheet - ${formatMonth(month)}`;
   ws.getCell(1, 1).font = { bold: true, size: 14 };
 
-  // Header row (row 3): Project | 1..N | Total
+  // Header row (row 3): Code | Project | 1..N | Total
   const headerRow = ws.getRow(3);
-  headerRow.getCell(1).value = 'Project';
-  days.forEach((d, i) => (headerRow.getCell(2 + i).value = d));
-  headerRow.getCell(days.length + 2).value = 'Total';
+  headerRow.getCell(1).value = 'Code';
+  headerRow.getCell(2).value = 'Project';
+  days.forEach((d, i) => (headerRow.getCell(3 + i).value = d));
+  headerRow.getCell(days.length + 3).value = 'Total';
   headerRow.font = { bold: true };
   headerRow.alignment = { horizontal: 'center' };
   headerRow.getCell(1).alignment = { horizontal: 'left' };
+  headerRow.getCell(2).alignment = { horizontal: 'left' };
 
   // Project rows
   summary.grid.forEach((row) => {
     const r = ws.addRow([
       row.project.code,
+      row.project.name,
       ...days.map((d) => hours(row.minutesByDate[dateStr(d)] ?? 0)),
       hours(row.totalMinutes),
     ]);
-    r.getCell(1).value = `${row.project.code} — ${row.project.name}`;
-    r.getCell(days.length + 2).font = { bold: true };
+    r.getCell(days.length + 3).font = { bold: true };
   });
 
   // Totals row
   const totalRow = ws.addRow([
     'Total',
+    '',
     ...days.map((d) => {
       const mins = summary.grid.reduce((s, row) => s + (row.minutesByDate[dateStr(d)] ?? 0), 0);
       return hours(mins);
@@ -83,21 +86,20 @@ export async function buildTimesheetWorkbook(
   totalRow.font = { bold: true };
   totalRow.border = { top: { style: 'thin' } };
 
-  // Weekend shading on header + all data rows
-  for (let rowIdx = 3; rowIdx <= totalRow.number; rowIdx++) {
-    days.forEach((d, i) => {
-      if (isWeekend(d)) {
-        ws.getCell(rowIdx, 2 + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-      }
-    });
-  }
+  // Weekend days get a grey header only (no cell fills, so Excel gridlines stay visible).
+  days.forEach((d, i) => {
+    if (isWeekend(d)) headerRow.getCell(3 + i).font = { bold: true, color: { argb: 'FF94A3B8' } };
+  });
 
   // Column widths + number format
-  ws.getColumn(1).width = 34;
-  for (let c = 2; c <= days.length + 2; c++) {
+  ws.getColumn(1).width = 12;
+  ws.getColumn(2).width = 28;
+  for (let c = 3; c <= days.length + 3; c++) {
     ws.getColumn(c).width = 5.5;
     ws.getColumn(c).numFmt = durationNumFmt;
   }
+  // Column numFmt also hits the header cells; keep the day numbers plain.
+  headerRow.eachCell((cell) => (cell.numFmt = 'General'));
 
   // KPI block below the grid
   ws.addRow([]);

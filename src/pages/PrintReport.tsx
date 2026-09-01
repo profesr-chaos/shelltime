@@ -71,7 +71,8 @@ export function PrintReport({ month }: { month: string }) {
       <table className="w-full border-collapse text-center text-[9px] leading-tight">
         <thead>
           <tr className="border-b-2 border-slate-300">
-            <th className="sticky left-0 bg-white px-1 py-1 text-left text-[10px] font-bold">Project</th>
+            <th className="sticky left-0 bg-white px-1 py-1 text-left text-[10px] font-bold">Code</th>
+            <th className="px-1 py-1 text-left text-[10px] font-bold">Project</th>
             {days.map((d) => (
               <th key={d} className={`px-0.5 py-1 font-semibold ${isWeekend(d) ? 'bg-slate-100 text-slate-400' : 'text-slate-500'}`}>
                 {d}
@@ -83,15 +84,13 @@ export function PrintReport({ month }: { month: string }) {
         <tbody>
           {summary.grid.length === 0 && (
             <tr>
-              <td colSpan={days.length + 2} className="py-4 text-slate-400">No tracked time this month.</td>
+              <td colSpan={days.length + 3} className="py-4 text-slate-400">No tracked time this month.</td>
             </tr>
           )}
           {summary.grid.map((row) => (
             <tr key={row.project.id} className="border-b border-slate-100">
-              <td className="sticky left-0 bg-white px-1 py-1 text-left">
-                <span className="font-bold" style={{ color: row.project.color }}>{row.project.code}</span>
-                <span className="ml-1 text-slate-400">{row.project.name}</span>
-              </td>
+              <td className="sticky left-0 bg-white px-1 py-1 text-left font-bold" style={{ color: row.project.color }}>{row.project.code}</td>
+              <td className="px-1 py-1 text-left text-slate-500">{row.project.name}</td>
               {days.map((d) => {
                 const mins = row.minutesByDate[dateStr(d)] ?? 0;
                 return (
@@ -107,6 +106,7 @@ export function PrintReport({ month }: { month: string }) {
         <tfoot>
           <tr className="border-t-2 border-slate-300 font-bold">
             <td className="sticky left-0 bg-white px-1 py-1 text-left text-[10px]">Total</td>
+            <td />
             {days.map((d) => {
               const mins = dayTotals.get(dateStr(d)) ?? 0;
               return (
