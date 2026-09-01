@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.3',
+    highlights: [
+      'Excel export now has separate Code and Project columns, and number cells no longer have a background fill.',
+      'Day-number headers in the Excel export show plain numbers instead of 24:00, 48:00 ...',
+      'PDF and print reports use the same Code and Project columns.',
+    ],
+  },
+  {
     version: '0.7.2',
     highlights: [
       'New export setting to choose how times appear in reports and spreadsheets: hours and minutes (7:30), decimal hours (7.5), or comma decimals (7,5) for pasting into EU-locale Excel.',
