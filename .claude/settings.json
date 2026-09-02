@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(gh pr create*)",
+            "command": "python .claude/hooks/require-review.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

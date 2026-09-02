@@ -3,3 +3,6 @@ dist
 dist-electron
 release
 *.log
+.claude/worktrees/
+.claude/settings.local.json
+.claude/.review-ok
