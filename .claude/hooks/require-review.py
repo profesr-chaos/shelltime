@@ -4,15 +4,18 @@ The review marker is .claude/.review-ok and holds the commit SHA the review cove
 Write it after a clean review with:  git rev-parse HEAD > .claude/.review-ok
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 MARKER = Path(".claude/.review-ok")
+# `gh pr create` at the start of a command or after a shell separator, not inside a string.
+PR_CREATE = re.compile(r"(^|[;&|(]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
 payload = json.load(sys.stdin)
 command = payload.get("tool_input", {}).get("command", "")
-if "gh pr create" not in command:
+if not PR_CREATE.search(command):
     sys.exit(0)
 
 head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()

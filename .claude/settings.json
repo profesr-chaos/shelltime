@@ -2,11 +2,10 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(gh pr create*)",
             "command": "python .claude/hooks/require-review.py",
             "timeout": 15
           }
