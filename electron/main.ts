@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog, shell, screen, powerMonitor } from 'electron';
 import path from 'node:path';
+import { autoUpdater } from 'electron-updater';
 import * as db from './db';
 import { TimerEngine } from './timer';
 import { AttentionMonitor } from './attentionMonitor';
@@ -297,6 +298,56 @@ function closeReviewSilently() {
   broadcast('review:dismissed');
 }
 
+// ---- Auto-update ---------------------------------------------------------------------------
+// electron-updater downloads in the background; NSIS installs silently on quit. We only *ask* to
+// restart while the timer is idle so a restart never kills a running/paused session. If the user
+// picks "Later" (or never idles), autoInstallOnAppQuit still applies the update on the next quit.
+let updateReady = false;
+let updatePrompted = false;
+let restartForUpdate = false;
+
+function setupAutoUpdate() {
+  if (!app.isPackaged) return; // checkForUpdates throws in dev
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', (err) => console.error('Auto-update failed:', err));
+  autoUpdater.on('update-downloaded', () => {
+    updateReady = true;
+    maybePromptRestart();
+  });
+  autoUpdater.checkForUpdates().catch(() => {}); // offline / rate-limited is fine
+}
+
+// Called on download and on every timer state change; prompts once per session, and only when idle.
+function maybePromptRestart() {
+  if (!updateReady || updatePrompted || timer.getState().status !== 'idle') return;
+  updatePrompted = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+  dialog
+    .showMessageBox({
+      type: 'info',
+      title: 'Update ready',
+      message: 'A new version of Shelltime is downloaded.',
+      detail: 'Restart now to install it, or it will install the next time you quit.',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then(({ response }) => {
+      if (response !== 0) return;
+      restartForUpdate = true;
+      requestQuit(); // goes through the day-review card like any other quit
+    });
+}
+
+// The single exit point: quitAndInstall relaunches the app after the update; a plain quit lets
+// autoInstallOnAppQuit apply a downloaded update silently without relaunching.
+function doQuit() {
+  (app as any).isQuitting = true;
+  if (restartForUpdate) autoUpdater.quitAndInstall(true, true);
+  else app.quit();
+}
+
 // Used by both the tray "Quit Shelltime" item and the main window's close (✕) handler.
 function requestQuit() {
   const tracked = db.getDailyTotalMinutes(todayStr());
@@ -314,8 +365,7 @@ function requestQuit() {
     return;
   }
   // Nothing tracked today, or a card is already open (a second ✕/tray-quit while it's showing) — quit now.
-  (app as any).isQuitting = true;
-  app.quit();
+  doQuit();
 }
 
 function registerIpc() {
@@ -427,8 +477,7 @@ function registerIpc() {
     broadcast('review:dismissed');
     if (pendingQuit) {
       pendingQuit = false;
-      (app as any).isQuitting = true;
-      app.quit();
+      doQuit();
     }
   });
 
@@ -622,7 +671,10 @@ app.whenReady().then(() => {
   app.setLoginItemSettings({ openAtLogin: settings.startWithWindows });
 
   timer = new TimerEngine({
-    onUpdate: (state) => broadcast('timer:update', state),
+    onUpdate: (state) => {
+      broadcast('timer:update', state);
+      maybePromptRestart();
+    },
   });
 
   calendar = new CalendarMonitor(() => db.getSettings().calendarIcsUrl);
@@ -664,6 +716,7 @@ app.whenReady().then(() => {
   createConfettiWindow();
   const rebuildTrayMenu = createTray();
   setInterval(rebuildTrayMenu, 5000);
+  setupAutoUpdate();
 
   // Sleep/resume can leave the compositor showing a stale (black) transparent surface — nudge it
   // to repaint if the overlay is visible.

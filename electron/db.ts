@@ -130,12 +130,28 @@ export function initDb(userDataDir: string) {
     CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date);
   `);
 
+  backupBeforeMigration(path.join(userDataDir, 'shelltime.db'));
   runMigrations();
   seedSettingsDefaults();
 }
 
 // Bump SCHEMA_VERSION and append a migration when the schema changes; each migration[i] upgrades vN(i) -> v(i+1).
 const SCHEMA_VERSION = 7;
+
+// Auto-updates install silently, so a bad migration would otherwise strand the user with no way back.
+// Keep one copy per schema version alongside the live db (a handful of small files at most).
+function backupBeforeMigration(dbPath: string) {
+  const current = db.pragma('user_version', { simple: true }) as number;
+  if (current === 0 || current >= SCHEMA_VERSION) return; // fresh db, or nothing to migrate
+  const dest = `${dbPath}.pre-v${current}.bak`;
+  if (fs.existsSync(dest)) return;
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)'); // fold the WAL in so the file copy is complete
+    fs.copyFileSync(dbPath, dest);
+  } catch (err) {
+    console.error('Pre-migration backup failed:', err);
+  }
+}
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true }) as number;
   const migrations: (() => void)[] = [

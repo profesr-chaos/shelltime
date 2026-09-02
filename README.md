@@ -67,6 +67,24 @@ The installer is written to `release/` as `Shelltime Setup <version>.exe`. It is
 **unsigned**, so Windows SmartScreen will warn on first run — choose
 **More info → Run anyway**.
 
+### Publishing an update
+
+Installed copies check GitHub Releases on launch and download new versions in the
+background (`electron-updater`). For that to work the release must carry
+`latest.yml` and the `.blockmap` next to the installer, so publish with:
+
+```bash
+GH_TOKEN=<github token with repo scope> npm run release
+```
+
+This builds, creates a draft release `v<version>`, and uploads all three files.
+Publish the draft on GitHub. Do **not** rename the uploaded assets — `latest.yml`
+records the exact file name and hash.
+
+Users are only asked to restart while the timer is idle; otherwise the update
+installs silently on the next quit. Before any schema migration the app copies
+the database to `shelltime.db.pre-v<N>.bak` in the data folder.
+
 Upgrades install over an existing version and **preserve data**: the SQLite
 database lives in the OS user-data directory (see below), separate from the
 install folder, and schema changes are handled by an internal migration runner.
