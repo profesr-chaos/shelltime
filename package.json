@@ -10,10 +10,12 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/logic.test.mts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/attentionMonitor.test.mts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/calendarMonitor.test.mts && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/timesheetXlsx.test.mts",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win",
+    "release": "npm run build && electron-builder --win --publish always"
   },
   "build": {
     "appId": "com.mradamtweedie.shelltime",
+    "publish": { "provider": "github", "owner": "profesr-chaos", "repo": "shelltime" },
     "productName": "Shelltime",
     "directories": {
       "output": "release"
@@ -44,6 +46,7 @@
   "dependencies": {
     "better-sqlite3": "^11.9.1",
     "date-holidays": "^3.32.0",
+    "electron-updater": "^6.8.9",
     "exceljs": "^4.4.0",
     "node-ical": "^0.26.1",
     "react": "^18.3.1",
