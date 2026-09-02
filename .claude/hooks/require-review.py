@@ -2,6 +2,9 @@
 
 The review marker is .claude/.review-ok and holds the commit SHA the review covered.
 Write it after a clean review with:  git rev-parse HEAD > .claude/.review-ok
+
+Scope: this stops a forgotten review, not a determined bypass. It matches `gh pr create` at the
+start of a command or after a shell separator. `eval`, `sh -c`, aliases and variables are out of scope.
 """
 import json
 import re
@@ -10,8 +13,8 @@ import sys
 from pathlib import Path
 
 MARKER = Path(".claude/.review-ok")
-# `gh pr create` at the start of a command or after a shell separator, not inside a string.
-PR_CREATE = re.compile(r"(^|[;&|(])\s*gh\s+pr\s+create\b", re.MULTILINE)
+# `gh pr create` at the start of a command or after a shell separator (; & | ( ` {), not inside a string.
+PR_CREATE = re.compile(r"(^|[;&|(`{])\s*gh\s+pr\s+create\b", re.MULTILINE)
 
 payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
 command = payload.get("tool_input", {}).get("command", "")
