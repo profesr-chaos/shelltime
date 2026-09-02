@@ -13,13 +13,22 @@ MARKER = Path(".claude/.review-ok")
 # `gh pr create` at the start of a command or after a shell separator, not inside a string.
 PR_CREATE = re.compile(r"(^|[;&|(]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
-payload = json.load(sys.stdin)
+payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
 command = payload.get("tool_input", {}).get("command", "")
 if not PR_CREATE.search(command):
     sys.exit(0)
 
 head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-reviewed = MARKER.read_text().strip() if MARKER.exists() else ""
+
+# PowerShell `>` writes UTF-16 (5.1) or UTF-8 with BOM (7+); bash writes plain UTF-8. Accept all three.
+raw = MARKER.read_bytes() if MARKER.exists() else b""
+reviewed = ""
+for encoding in ("utf-8-sig", "utf-16"):
+    try:
+        reviewed = raw.decode(encoding).strip()
+        break
+    except UnicodeDecodeError:
+        continue
 
 if reviewed == head:
     sys.exit(0)
