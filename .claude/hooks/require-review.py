@@ -11,7 +11,7 @@ from pathlib import Path
 
 MARKER = Path(".claude/.review-ok")
 # `gh pr create` at the start of a command or after a shell separator, not inside a string.
-PR_CREATE = re.compile(r"(^|[;&|(]\s*)gh\s+pr\s+create\b", re.MULTILINE)
+PR_CREATE = re.compile(r"(^|[;&|(])\s*gh\s+pr\s+create\b", re.MULTILINE)
 
 payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
 command = payload.get("tool_input", {}).get("command", "")
