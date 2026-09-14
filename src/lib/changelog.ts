@@ -7,6 +7,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.4',
+    highlights: [
+      'The auto-resume prompt now has simpler Keep / Discard buttons in both the modal and the overlay.',
+    ],
+  },
+  {
     version: '0.7.3',
     highlights: [
       'Excel export now has separate Code and Project columns, and number cells no longer have a background fill.',
