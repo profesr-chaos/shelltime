@@ -20,14 +20,14 @@ export function ResumePromptModal() {
       onClose={keep}
       footer={
         <>
-          <Button variant="secondary" onClick={reject}>Not yet</Button>
-          <Button variant="primary" onClick={keep}>Keep going</Button>
+          <Button variant="secondary" onClick={reject}>Discard</Button>
+          <Button variant="primary" onClick={keep}>Keep</Button>
         </>
       }
     >
       <p className="text-center font-mono text-3xl font-bold tabular-nums text-amber">{secondsToHms(liveSeconds)}</p>
       <p className="mt-3 text-sm text-slate-600">
-        Detected activity, so timing resumed. Keep going, or reject it to pause again and drop this time.
+        Activity detected, so the timer resumed. Keep this time, or discard it and pause again.
       </p>
     </Modal>
   );

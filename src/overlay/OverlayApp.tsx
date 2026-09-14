@@ -157,13 +157,13 @@ export function OverlayApp() {
             onClick={resumePrompt.keep}
             className="no-drag flex-1 rounded-lg bg-amber py-2 text-sm font-semibold text-white hover:bg-orange-600"
           >
-            Resume work
+            Keep
           </button>
           <button
             onClick={resumePrompt.reject}
             className="no-drag flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
           >
-            Not yet
+            Discard
           </button>
         </div>
         <div className="mt-3 flex justify-center">
